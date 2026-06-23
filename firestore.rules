@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 認証済みユーザーのみアクセス可
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // 原材料マスター
+    match /materials/{itemId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth();
+      allow delete: if isAuth();
+
+      // FIFOロット管理（サブコレクション）
+      match /lots/{lotId} {
+        allow read, write: if isAuth();
+      }
+    }
+
+    // 包材マスター
+    match /packaging/{itemId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth();
+      allow delete: if isAuth();
+
+      match /lots/{lotId} {
+        allow read, write: if isAuth();
+      }
+    }
+
+    // 製品在庫マスター
+    match /products/{itemId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth();
+      allow delete: if isAuth();
+
+      match /lots/{lotId} {
+        allow read, write: if isAuth();
+      }
+    }
+
+    // 入出庫ログ（追記のみ、削除不可）
+    match /transactions/{txId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if false;
+    }
+  }
+}

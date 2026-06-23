@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0f172a">
+<title>在庫管理 | エニクック</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<!-- Firebase compat SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+<style>
+/* ===== リセット & ベース ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:       #0f172a;
+  --bg2:      #1e293b;
+  --bg3:      #334155;
+  --border:   #334155;
+  --text:     #f1f5f9;
+  --muted:    #94a3b8;
+  --accent:   #22c55e;
+  --accent2:  #16a34a;
+  --warn:     #f59e0b;
+  --danger:   #ef4444;
+  --info:     #3b82f6;
+  --radius:   10px;
+  --font:     'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
+}
+html{font-size:15px;-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100dvh;display:flex;flex-direction:column}
+button{cursor:pointer;font-family:var(--font);font-size:inherit}
+input,select,textarea{font-family:var(--font);font-size:inherit}
+a{color:inherit;text-decoration:none}
+
+/* ===== ログイン画面 ===== */
+#login-screen{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100dvh;padding:2rem;gap:1.5rem;
+}
+.login-card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:2rem;width:100%;max-width:360px;display:flex;flex-direction:column;gap:1rem;
+}
+.login-card h1{font-size:1.3rem;font-weight:600;text-align:center}
+.login-card p{font-size:.85rem;color:var(--muted);text-align:center}
+.field{display:flex;flex-direction:column;gap:.4rem}
+.field label{font-size:.82rem;color:var(--muted)}
+.field input{
+  background:var(--bg3);border:1px solid var(--border);border-radius:8px;
+  padding:.6rem .9rem;color:var(--text);outline:none;
+}
+.field input:focus{border-color:var(--accent)}
+
+/* ===== ヘッダー ===== */
+#header{
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.75rem 1rem;position:sticky;top:0;z-index:100;
+}
+.header-left{display:flex;align-items:center;gap:.75rem}
+.logo{font-weight:700;font-size:1rem;color:var(--accent)}
+.logo span{color:var(--text);font-weight:400;font-size:.85rem;margin-left:.3rem}
+#alert-badge{
+  background:var(--danger);color:#fff;border-radius:9999px;
+  padding:.15rem .55rem;font-size:.72rem;font-weight:700;display:none;
+}
+
+/* ===== タブナビ ===== */
+#tabs{
+  display:flex;overflow-x:auto;background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  scrollbar-width:none;
+}
+#tabs::-webkit-scrollbar{display:none}
+.tab{
+  flex-shrink:0;padding:.7rem 1.1rem;font-size:.83rem;color:var(--muted);
+  border-bottom:2px solid transparent;white-space:nowrap;background:none;border-top:none;
+  border-left:none;border-right:none;transition:color .15s,border-color .15s;
+}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* ===== メインコンテンツ ===== */
+#main{flex:1;padding:1rem;max-width:900px;margin:0 auto;width:100%}
+.page{display:none}
+.page.active{display:block}
+
+/* ===== カード ===== */
+.card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:1.1rem;margin-bottom:1rem;
+}
+.card-title{font-size:.82rem;color:var(--muted);margin-bottom:.75rem;font-weight:500;letter-spacing:.03em}
+
+/* ===== フォーム部品 ===== */
+.form-row{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:.75rem}
+.form-group{display:flex;flex-direction:column;gap:.35rem;flex:1;min-width:140px}
+.form-group label{font-size:.78rem;color:var(--muted)}
+.form-group input,.form-group select,.form-group textarea{
+  background:var(--bg3);border:1px solid var(--border);border-radius:8px;
+  padding:.55rem .8rem;color:var(--text);outline:none;width:100%;
+}
+.form-group input:focus,.form-group select:focus{border-color:var(--accent)}
+.form-group select option{background:var(--bg2)}
+
+/* ===== ボタン ===== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  padding:.6rem 1.2rem;border-radius:8px;font-weight:600;font-size:.85rem;
+  border:none;transition:opacity .15s;
+}
+.btn:active{opacity:.8}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--muted)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-sm{padding:.4rem .85rem;font-size:.78rem}
+.btn-block{width:100%}
+
+/* ===== バッジ ===== */
+.badge{display:inline-block;padding:.18rem .55rem;border-radius:9999px;font-size:.7rem;font-weight:700}
+.badge-green{background:#14532d;color:#4ade80}
+.badge-amber{background:#78350f;color:#fcd34d}
+.badge-red{background:#7f1d1d;color:#fca5a5}
+.badge-blue{background:#1e3a5f;color:#93c5fd}
+.badge-gray{background:var(--bg3);color:var(--muted)}
+
+/* ===== テーブル ===== */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+th{text-align:left;padding:.5rem .7rem;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:.55rem .7rem;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg3)}
+
+/* ===== アラートボックス ===== */
+.alert-item{
+  display:flex;align-items:center;gap:.75rem;
+  padding:.7rem .9rem;border-radius:8px;margin-bottom:.5rem;font-size:.83rem;
+}
+.alert-reorder{background:#78350f22;border:1px solid #92400e}
+.alert-expiry{background:#7f1d1d22;border:1px solid #991b1b}
+.alert-excess{background:#1e3a5f22;border:1px solid #1d4ed8}
+.alert-icon{font-size:1.1rem}
+
+/* ===== サマリーカード ===== */
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem;margin-bottom:1rem}
+.summary-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:1rem}
+.summary-card .val{font-size:1.8rem;font-weight:700;line-height:1}
+.summary-card .lbl{font-size:.75rem;color:var(--muted);margin-top:.4rem}
+.summary-card.warn .val{color:var(--warn)}
+.summary-card.danger .val{color:var(--danger)}
+.summary-card.good .val{color:var(--accent)}
+
+/* ===== ローディング ===== */
+.loading{text-align:center;color:var(--muted);padding:2rem;font-size:.85rem}
+
+/* ===== モーダル ===== */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;
+  display:flex;align-items:flex-end;justify-content:center;
+}
+.modal-overlay.hidden{display:none}
+.modal{
+  background:var(--bg2);border-radius:var(--radius) var(--radius) 0 0;
+  width:100%;max-width:560px;max-height:90dvh;overflow-y:auto;
+  padding:1.25rem;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom));
+}
+.modal-title{font-size:1rem;font-weight:600;margin-bottom:1rem}
+.modal-close{float:right;background:none;border:none;color:var(--muted);font-size:1.3rem;line-height:1}
+
+/* ===== ABC分析 ===== */
+.abc-bar-wrap{height:18px;background:var(--bg3);border-radius:9999px;overflow:hidden;margin-top:.3rem}
+.abc-bar{height:100%;border-radius:9999px;transition:width .4s}
+
+/* ===== レスポンシブ ===== */
+@media(max-width:480px){
+  #main{padding:.75rem}
+  .form-row{flex-direction:column}
+  .form-group{min-width:0}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== ログイン画面 ===== -->
+<div id="login-screen">
+  <div class="login-card">
+    <h1>🥘 エニクック<br>在庫管理システム</h1>
+    <p>スタッフアカウントでログインしてください</p>
+    <div class="field">
+      <label>メールアドレス</label>
+      <input type="email" id="login-email" placeholder="例: staff@anycook.jp" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>パスワード</label>
+      <input type="password" id="login-pass" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary btn-block" onclick="doLogin()">ログイン</button>
+    <p id="login-err" style="color:var(--danger);font-size:.8rem;text-align:center;display:none"></p>
+  </div>
+</div>
+
+<!-- ===== アプリ本体（ログイン後） ===== -->
+<div id="app" style="display:none;flex-direction:column;min-height:100dvh">
+
+  <!-- ヘッダー -->
+  <div id="header">
+    <div class="header-left">
+      <span class="logo">エニクック <span>在庫管理</span></span>
+      <span id="alert-badge">!</span>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="doLogout()">ログアウト</button>
+  </div>
+
+  <!-- タブ -->
+  <div id="tabs">
+    <button class="tab active" onclick="showTab('dashboard',this)">ダッシュボード</button>
+    <button class="tab" onclick="showTab('io',this)">入出庫</button>
+    <button class="tab" onclick="showTab('materials',this)">原材料</button>
+    <button class="tab" onclick="showTab('packaging',this)">包材</button>
+    <button class="tab" onclick="showTab('products',this)">製品</button>
+    <button class="tab" onclick="showTab('history',this)">履歴</button>
+  </div>
+
+  <!-- メイン -->
+  <div id="main">
+
+    <!-- ======= ダッシュボード ======= -->
+    <div id="page-dashboard" class="page active">
+      <div class="summary-grid" id="summary-grid">
+        <div class="summary-card"><div class="val" id="sum-materials">-</div><div class="lbl">原材料 品目数</div></div>
+        <div class="summary-card"><div class="val" id="sum-packaging">-</div><div class="lbl">包材 品目数</div></div>
+        <div class="summary-card"><div class="val" id="sum-products">-</div><div class="lbl">製品 品目数</div></div>
+        <div class="summary-card warn"><div class="val" id="sum-alerts">-</div><div class="lbl">要対応アラート</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">アラート一覧</div>
+        <div id="alerts-list"><div class="loading">読み込み中...</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">最近の入出庫（直近10件）</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>日時</th><th>区分</th><th>品名</th><th>数量</th><th>担当</th></tr></thead>
+            <tbody id="recent-tx"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= 入出庫 ======= -->
+    <div id="page-io" class="page">
+      <div class="card">
+        <div class="card-title">入出庫・廃棄を記録する</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>区分</label>
+            <select id="io-type" onchange="onIoTypeChange()">
+              <option value="in">入庫</option>
+              <option value="out">出庫</option>
+              <option value="discard">廃棄</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>カテゴリ</label>
+            <select id="io-category" onchange="loadIoItems()">
+              <option value="materials">原材料</option>
+              <option value="packaging">包材</option>
+              <option value="products">製品</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:2">
+            <label>品名</label>
+            <select id="io-item"><option value="">品目を選択...</option></select>
+          </div>
+          <div class="form-group">
+            <label>数量</label>
+            <input type="number" id="io-qty" min="0.01" step="0.01" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label>単位</label>
+            <input type="text" id="io-unit" placeholder="kg / 袋 / 本" readonly style="color:var(--muted)">
+          </div>
+        </div>
+        <!-- 入庫時のみ表示 -->
+        <div id="io-in-fields">
+          <div class="form-row">
+            <div class="form-group">
+              <label>ロット番号</label>
+              <input type="text" id="io-lot" placeholder="例: LOT-2025-001">
+            </div>
+            <div class="form-group">
+              <label>賞味期限（任意）</label>
+              <input type="date" id="io-expiry">
+            </div>
+          </div>
+        </div>
+        <!-- 出庫時のみ表示 -->
+        <div id="io-out-fields" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label>出庫ロット（FIFO自動選択 or 指定）</label>
+              <select id="io-lot-select"><option value="auto">FIFO自動（推奨）</option></select>
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:2">
+            <label>備考（任意）</label>
+            <input type="text" id="io-note" placeholder="納品書番号、使用先など">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="submitIO()">記録する</button>
+        <span id="io-msg" style="margin-left:.75rem;font-size:.82rem"></span>
+      </div>
+    </div>
+
+    <!-- ======= 原材料 ======= -->
+    <div id="page-materials" class="page">
+      <div style="display:flex;gap:.75rem;margin-bottom:1rem;align-items:center">
+        <input type="text" id="mat-search" placeholder="品名で検索..." style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:.55rem .8rem;color:var(--text);outline:none" oninput="renderItems('materials')">
+        <button class="btn btn-primary btn-sm" onclick="openAddModal('materials')">＋ 新規登録</button>
+      </div>
+      <div class="card" style="padding:0">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>品名</th><th>在庫</th><th>安全在庫</th><th>発注点</th><th>状態</th><th>ABC</th><th>操作</th></tr></thead>
+            <tbody id="materials-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= 包材 ======= -->
+    <div id="page-packaging" class="page">
+      <div style="display:flex;gap:.75rem;margin-bottom:1rem;align-items:center">
+        <input type="text" id="pkg-search" placeholder="品名で検索..." style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:.55rem .8rem;color:var(--text);outline:none" oninput="renderItems('packaging')">
+        <button class="btn btn-primary btn-sm" onclick="openAddModal('packaging')">＋ 新規登録</button>
+      </div>
+      <div class="card" style="padding:0">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>品名</th><th>在庫</th><th>安全在庫</th><th>発注点</th><th>状態</th><th>ABC</th><th>操作</th></tr></thead>
+            <tbody id="packaging-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= 製品 ======= -->
+    <div id="page-products" class="page">
+      <div style="display:flex;gap:.75rem;margin-bottom:1rem;align-items:center">
+        <input type="text" id="prd-search" placeholder="品名で検索..." style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:.55rem .8rem;color:var(--text);outline:none" oninput="renderItems('products')">
+        <button class="btn btn-primary btn-sm" onclick="openAddModal('products')">＋ 新規登録</button>
+      </div>
+      <div class="card" style="padding:0">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>品名</th><th>在庫</th><th>安全在庫</th><th>発注点</th><th>賞味期限</th><th>状態</th><th>ABC</th><th>操作</th></tr></thead>
+            <tbody id="products-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= 履歴 ======= -->
+    <div id="page-history" class="page">
+      <div class="card">
+        <div class="card-title">入出庫履歴</div>
+        <div class="form-row" style="margin-bottom:1rem">
+          <div class="form-group">
+            <label>カテゴリ絞込</label>
+            <select id="hist-cat" onchange="loadHistory()">
+              <option value="">すべて</option>
+              <option value="materials">原材料</option>
+              <option value="packaging">包材</option>
+              <option value="products">製品</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>区分絞込</label>
+            <select id="hist-type" onchange="loadHistory()">
+              <option value="">すべて</option>
+              <option value="in">入庫</option>
+              <option value="out">出庫</option>
+              <option value="discard">廃棄</option>
+            </select>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>日時</th><th>区分</th><th>カテゴリ</th><th>品名</th><th>ロット</th><th>数量</th><th>担当</th><th>備考</th></tr></thead>
+            <tbody id="history-tbody"><tr><td colspan="8" class="loading">読み込み中...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ===== 品目追加・編集モーダル ===== -->
+<div class="modal-overlay hidden" id="item-modal">
+  <div class="modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <span class="modal-title" id="modal-title">品目を登録</span>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <input type="hidden" id="modal-id">
+    <input type="hidden" id="modal-cat">
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label>品名 *</label>
+        <input type="text" id="modal-name" placeholder="例: 有機トマトペースト">
+      </div>
+      <div class="form-group">
+        <label>単位 *</label>
+        <input type="text" id="modal-unit" placeholder="kg / 袋 / 本 / 枚">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>現在在庫数</label>
+        <input type="number" id="modal-qty" min="0" step="0.01" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label>安全在庫（最低限必要な量）</label>
+        <input type="number" id="modal-safety" min="0" step="0.01" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label>発注点（この量を下回ったら発注）</label>
+        <input type="number" id="modal-reorder" min="0" step="0.01" placeholder="0">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>ABCランク</label>
+        <select id="modal-abc">
+          <option value="A">A（高単価・重要品）</option>
+          <option value="B">B（中間）</option>
+          <option value="C" selected>C（安価・副資材）</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>仕入先（任意）</label>
+        <input type="text" id="modal-supplier" placeholder="例: 日本食研">
+      </div>
+    </div>
+    <div class="form-row" id="modal-expiry-row">
+      <div class="form-group">
+        <label>賞味期限日数（製品のみ・任意）</label>
+        <input type="number" id="modal-expiry-days" min="1" placeholder="例: 730（約2年）">
+      </div>
+    </div>
+    <div style="display:flex;gap:.75rem;margin-top:.5rem">
+      <button class="btn btn-primary" onclick="saveItem()">保存する</button>
+      <button class="btn btn-outline" onclick="closeModal()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================================================
+//  Firebase 設定 ※ご自身のプロジェクト設定に書き換えてください
+// ===================================================
+var firebaseConfig = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+var db   = firebase.firestore();
+var auth = firebase.auth();
+
+// ===================================================
+//  グローバル状態
+// ===================================================
+var currentUser   = null;
+var allItems      = { materials:{}, packaging:{}, products:{} };
+var unsubListeners = [];
+
+// ===================================================
+//  認証
+// ===================================================
+auth.onAuthStateChanged(function(user) {
+  if (user) {
+    currentUser = user;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    startListeners();
+  } else {
+    currentUser = null;
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+});
+
+function doLogin() {
+  var email = document.getElementById('login-email').value.trim();
+  var pass  = document.getElementById('login-pass').value;
+  var err   = document.getElementById('login-err');
+  err.style.display = 'none';
+  auth.signInWithEmailAndPassword(email, pass).catch(function(e) {
+    err.textContent = 'ログインできませんでした。メールアドレスとパスワードを確認してください。';
+    err.style.display = 'block';
+  });
+}
+
+function doLogout() {
+  unsubListeners.forEach(function(u){ u(); });
+  unsubListeners = [];
+  auth.signOut();
+}
+
+// ===================================================
+//  リアルタイムリスナー起動
+// ===================================================
+function startListeners() {
+  ['materials','packaging','products'].forEach(function(cat) {
+    var unsub = db.collection(cat).onSnapshot(function(snap) {
+      snap.forEach(function(doc) {
+        allItems[cat][doc.id] = Object.assign({ id: doc.id }, doc.data());
+      });
+      snap.docChanges().forEach(function(change) {
+        if (change.type === 'removed') {
+          delete allItems[cat][change.doc.id];
+        }
+      });
+      renderItems(cat);
+      refreshDashboard();
+    });
+    unsubListeners.push(unsub);
+  });
+  loadHistory();
+}
+
+// ===================================================
+//  タブ切替
+// ===================================================
+function showTab(name, el) {
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+  document.getElementById('page-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'history') loadHistory();
+  if (name === 'io') loadIoItems();
+}
+
+// ===================================================
+//  ダッシュボード
+// ===================================================
+function refreshDashboard() {
+  var matCount = Object.keys(allItems.materials).length;
+  var pkgCount = Object.keys(allItems.packaging).length;
+  var prdCount = Object.keys(allItems.products).length;
+  document.getElementById('sum-materials').textContent = matCount;
+  document.getElementById('sum-packaging').textContent = pkgCount;
+  document.getElementById('sum-products').textContent  = prdCount;
+
+  var alerts = buildAlerts();
+  document.getElementById('sum-alerts').textContent = alerts.length;
+
+  var badge = document.getElementById('alert-badge');
+  if (alerts.length > 0) {
+    badge.style.display = 'inline';
+    badge.textContent = alerts.length;
+  } else {
+    badge.style.display = 'none';
+  }
+
+  var listEl = document.getElementById('alerts-list');
+  if (alerts.length === 0) {
+    listEl.innerHTML = '<p style="color:var(--accent);font-size:.83rem;padding:.5rem 0">✅ アラートはありません</p>';
+    return;
+  }
+  listEl.innerHTML = alerts.map(function(a) {
+    var cls = a.type === 'reorder' ? 'alert-reorder' : a.type === 'expiry' ? 'alert-expiry' : 'alert-excess';
+    var icon = a.type === 'reorder' ? '🔴' : a.type === 'expiry' ? '⚠️' : '🔵';
+    return '<div class="alert-item ' + cls + '"><span class="alert-icon">' + icon + '</span><span>' + a.msg + '</span></div>';
+  }).join('');
+}
+
+function buildAlerts() {
+  var alerts = [];
+  var today = new Date(); today.setHours(0,0,0,0);
+  var in30  = new Date(today); in30.setDate(in30.getDate() + 30);
+
+  ['materials','packaging','products'].forEach(function(cat) {
+    var label = cat === 'materials' ? '原材料' : cat === 'packaging' ? '包材' : '製品';
+    Object.values(allItems[cat]).forEach(function(item) {
+      var qty     = item.currentQty  || 0;
+      var reorder = item.reorderPoint || 0;
+      var safety  = item.safetyStock  || 0;
+
+      if (reorder > 0 && qty <= reorder) {
+        alerts.push({ type:'reorder', msg: label + '「' + item.name + '」の在庫が発注点以下です（現在: ' + qty + ' ' + item.unit + '）' });
+      }
+      if (item.expiryDate) {
+        var exp = new Date(item.expiryDate);
+        if (exp <= in30 && exp >= today) {
+          alerts.push({ type:'expiry', msg: label + '「' + item.name + '」の賞味期限が30日以内です（' + item.expiryDate + '）' });
+        } else if (exp < today) {
+          alerts.push({ type:'expiry', msg: label + '「' + item.name + '」の賞味期限が切れています（' + item.expiryDate + '）' });
+        }
+      }
+    });
+  });
+  return alerts;
+}
+
+// 直近履歴（ダッシュボード）
+function loadRecentTx() {
+  db.collection('transactions').orderBy('timestamp','desc').limit(10).get().then(function(snap) {
+    var rows = '';
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      var ts = d.timestamp ? new Date(d.timestamp.seconds*1000) : new Date();
+      var label = d.category === 'materials' ? '原材料' : d.category === 'packaging' ? '包材' : '製品';
+      var typeLabel = d.type === 'in' ? '<span class="badge badge-green">入庫</span>' :
+                      d.type === 'out' ? '<span class="badge badge-blue">出庫</span>' :
+                      '<span class="badge badge-red">廃棄</span>';
+      rows += '<tr><td style="white-space:nowrap">' + fmtDate(ts) + '</td><td>' + typeLabel + '</td>' +
+              '<td>' + esc(d.itemName||'') + '</td><td>' + d.qty + ' ' + esc(d.unit||'') + '</td>' +
+              '<td style="color:var(--muted)">' + esc(d.operator||'') + '</td></tr>';
+    });
+    document.getElementById('recent-tx').innerHTML = rows || '<tr><td colspan="5" style="color:var(--muted);text-align:center">記録なし</td></tr>';
+  });
+}
+
+// ===================================================
+//  在庫一覧テーブル描画
+// ===================================================
+function renderItems(cat) {
+  var searchId = cat === 'materials' ? 'mat-search' : cat === 'packaging' ? 'pkg-search' : 'prd-search';
+  var searchEl = document.getElementById(searchId);
+  var q = searchEl ? searchEl.value.trim().toLowerCase() : '';
+  var tbodyId = cat + '-tbody';
+  var tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+
+  var items = Object.values(allItems[cat]);
+  if (q) items = items.filter(function(i){ return i.name && i.name.toLowerCase().indexOf(q) !== -1; });
+  items.sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','ja'); });
+
+  if (items.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:1.5rem">品目が登録されていません</td></tr>';
+    return;
+  }
+
+  var html = items.map(function(item) {
+    var qty     = item.currentQty  || 0;
+    var safety  = item.safetyStock  || 0;
+    var reorder = item.reorderPoint || 0;
+    var status  = qty <= (reorder || safety) && (reorder || safety) > 0
+                  ? '<span class="badge badge-red">発注要</span>'
+                  : qty <= safety && safety > 0
+                  ? '<span class="badge badge-amber">警告</span>'
+                  : '<span class="badge badge-green">正常</span>';
+    var abc = item.abcRank === 'A' ? '<span class="badge badge-red">A</span>' :
+              item.abcRank === 'B' ? '<span class="badge badge-amber">B</span>' :
+              '<span class="badge badge-gray">C</span>';
+
+    var expiryTd = cat === 'products'
+      ? '<td style="font-size:.78rem;color:var(--muted)">' + (item.expiryDate || '-') + '</td>'
+      : '';
+
+    return '<tr>' +
+      '<td><strong>' + esc(item.name||'') + '</strong>' +
+      (item.supplier ? '<br><span style="font-size:.72rem;color:var(--muted)">' + esc(item.supplier) + '</span>' : '') +
+      '</td>' +
+      '<td><strong>' + qty + '</strong> <span style="color:var(--muted);font-size:.78rem">' + esc(item.unit||'') + '</span></td>' +
+      '<td style="color:var(--muted)">' + safety + '</td>' +
+      '<td style="color:var(--muted)">' + reorder + '</td>' +
+      expiryTd +
+      '<td>' + status + '</td>' +
+      '<td>' + abc + '</td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn btn-outline btn-sm" onclick="openEditModal(\'' + cat + '\',\'' + item.id + '\')">編集</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+  tbody.innerHTML = html;
+}
+
+// ===================================================
+//  品目登録・編集モーダル
+// ===================================================
+function openAddModal(cat) {
+  document.getElementById('modal-id').value = '';
+  document.getElementById('modal-cat').value = cat;
+  document.getElementById('modal-title').textContent = catLabel(cat) + ' 新規登録';
+  document.getElementById('modal-name').value      = '';
+  document.getElementById('modal-unit').value      = '';
+  document.getElementById('modal-qty').value       = '0';
+  document.getElementById('modal-safety').value    = '0';
+  document.getElementById('modal-reorder').value   = '0';
+  document.getElementById('modal-abc').value       = 'C';
+  document.getElementById('modal-supplier').value  = '';
+  document.getElementById('modal-expiry-days').value = '';
+  document.getElementById('modal-expiry-row').style.display = cat === 'products' ? 'flex' : 'none';
+  document.getElementById('item-modal').classList.remove('hidden');
+}
+
+function openEditModal(cat, id) {
+  var item = allItems[cat][id];
+  if (!item) return;
+  document.getElementById('modal-id').value       = id;
+  document.getElementById('modal-cat').value      = cat;
+  document.getElementById('modal-title').textContent = catLabel(cat) + ' 編集';
+  document.getElementById('modal-name').value     = item.name     || '';
+  document.getElementById('modal-unit').value     = item.unit     || '';
+  document.getElementById('modal-qty').value      = item.currentQty  || 0;
+  document.getElementById('modal-safety').value   = item.safetyStock  || 0;
+  document.getElementById('modal-reorder').value  = item.reorderPoint || 0;
+  document.getElementById('modal-abc').value      = item.abcRank  || 'C';
+  document.getElementById('modal-supplier').value = item.supplier || '';
+  document.getElementById('modal-expiry-days').value = item.expiryDays || '';
+  document.getElementById('modal-expiry-row').style.display = cat === 'products' ? 'flex' : 'none';
+  document.getElementById('item-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('item-modal').classList.add('hidden');
+}
+
+function saveItem() {
+  var cat  = document.getElementById('modal-cat').value;
+  var id   = document.getElementById('modal-id').value;
+  var name = document.getElementById('modal-name').value.trim();
+  var unit = document.getElementById('modal-unit').value.trim();
+  if (!name || !unit) { alert('品名と単位は必須です'); return; }
+
+  var data = {
+    name:         name,
+    unit:         unit,
+    currentQty:   parseFloat(document.getElementById('modal-qty').value)    || 0,
+    safetyStock:  parseFloat(document.getElementById('modal-safety').value)  || 0,
+    reorderPoint: parseFloat(document.getElementById('modal-reorder').value) || 0,
+    abcRank:      document.getElementById('modal-abc').value,
+    supplier:     document.getElementById('modal-supplier').value.trim(),
+    updatedAt:    firebase.firestore.FieldValue.serverTimestamp()
+  };
+  if (cat === 'products') {
+    var ed = document.getElementById('modal-expiry-days').value;
+    if (ed) data.expiryDays = parseInt(ed);
+  }
+  if (!id) data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+
+  var ref = id ? db.collection(cat).doc(id) : db.collection(cat).doc();
+  var op  = id ? ref.update(data) : ref.set(data);
+  op.then(function() { closeModal(); })
+    .catch(function(e) { alert('保存に失敗しました: ' + e.message); });
+}
+
+// ===================================================
+//  入出庫フォーム
+// ===================================================
+function onIoTypeChange() {
+  var type = document.getElementById('io-type').value;
+  document.getElementById('io-in-fields').style.display  = type === 'in'  ? 'block' : 'none';
+  document.getElementById('io-out-fields').style.display = type !== 'in'  ? 'block' : 'none';
+  if (type !== 'in') loadLotsForOut();
+}
+
+function loadIoItems() {
+  var cat = document.getElementById('io-category').value;
+  var sel = document.getElementById('io-item');
+  sel.innerHTML = '<option value="">品目を選択...</option>';
+  document.getElementById('io-unit').value = '';
+  var items = Object.values(allItems[cat]);
+  items.sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','ja'); });
+  items.forEach(function(item) {
+    var opt = document.createElement('option');
+    opt.value = item.id;
+    opt.textContent = item.name + '（在庫: ' + (item.currentQty||0) + ' ' + item.unit + '）';
+    opt.dataset.unit = item.unit;
+    sel.appendChild(opt);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('io-item').addEventListener('change', function() {
+    var opt = this.options[this.selectedIndex];
+    document.getElementById('io-unit').value = opt.dataset.unit || '';
+    if (document.getElementById('io-type').value !== 'in') loadLotsForOut();
+  });
+});
+
+function loadLotsForOut() {
+  var cat    = document.getElementById('io-category').value;
+  var itemId = document.getElementById('io-item').value;
+  var sel    = document.getElementById('io-lot-select');
+  sel.innerHTML = '<option value="auto">FIFO自動（推奨）</option>';
+  if (!itemId) return;
+  db.collection(cat).doc(itemId).collection('lots')
+    .where('status','==','active')
+    .orderBy('receivedDate','asc')
+    .get().then(function(snap) {
+      snap.forEach(function(doc) {
+        var d = doc.data();
+        var opt = document.createElement('option');
+        opt.value = doc.id;
+        opt.textContent = (d.lotNo||doc.id) + '  入庫: ' + (d.receivedDate||'?') + '  残: ' + (d.qty||0);
+        sel.appendChild(opt);
+      });
+    });
+}
+
+function submitIO() {
+  var type   = document.getElementById('io-type').value;
+  var cat    = document.getElementById('io-category').value;
+  var itemId = document.getElementById('io-item').value;
+  var qty    = parseFloat(document.getElementById('io-qty').value);
+  var note   = document.getElementById('io-note').value.trim();
+  var msg    = document.getElementById('io-msg');
+
+  if (!itemId) { msg.style.color='var(--danger)'; msg.textContent='品目を選択してください'; return; }
+  if (!qty || qty <= 0) { msg.style.color='var(--danger)'; msg.textContent='数量を入力してください'; return; }
+
+  var item = allItems[cat][itemId];
+  var unit = item ? item.unit : '';
+
+  var tx = {
+    type:      type,
+    category:  cat,
+    itemId:    itemId,
+    itemName:  item ? item.name : '',
+    qty:       qty,
+    unit:      unit,
+    operator:  currentUser ? currentUser.email : '',
+    note:      note,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  var batch = db.batch();
+
+  if (type === 'in') {
+    var lotNo  = document.getElementById('io-lot').value.trim() || ('LOT-' + Date.now());
+    var expiry = document.getElementById('io-expiry').value;
+    var lotRef = db.collection(cat).doc(itemId).collection('lots').doc();
+    var lotData = {
+      lotNo:        lotNo,
+      receivedDate: new Date().toISOString().split('T')[0],
+      qty:          qty,
+      status:       'active'
+    };
+    if (expiry) { lotData.expiryDate = expiry; tx.expiryDate = expiry; }
+    tx.lotNo = lotNo;
+    tx.lotId = lotRef.id;
+    batch.set(lotRef, lotData);
+    batch.update(db.collection(cat).doc(itemId), {
+      currentQty: firebase.firestore.FieldValue.increment(qty),
+      updatedAt:  firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } else {
+    // 出庫・廃棄
+    var lotSelVal = document.getElementById('io-lot-select').value;
+    tx.lotId = lotSelVal === 'auto' ? 'auto-fifo' : lotSelVal;
+    batch.update(db.collection(cat).doc(itemId), {
+      currentQty: firebase.firestore.FieldValue.increment(-qty),
+      updatedAt:  firebase.firestore.FieldValue.serverTimestamp()
+    });
+    if (lotSelVal !== 'auto') {
+      // 指定ロットの残量を減らす（簡易版）
+      batch.update(db.collection(cat).doc(itemId).collection('lots').doc(lotSelVal), {
+        qty: firebase.firestore.FieldValue.increment(-qty)
+      });
+    }
+  }
+
+  batch.set(db.collection('transactions').doc(), tx);
+
+  batch.commit().then(function() {
+    msg.style.color = 'var(--accent)';
+    msg.textContent = '✅ 記録しました';
+    document.getElementById('io-qty').value  = '';
+    document.getElementById('io-note').value = '';
+    document.getElementById('io-lot').value  = '';
+    document.getElementById('io-expiry').value = '';
+    loadRecentTx();
+    setTimeout(function(){ msg.textContent = ''; }, 3000);
+  }).catch(function(e) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = '❌ 記録に失敗しました: ' + e.message;
+  });
+}
+
+// ===================================================
+//  履歴タブ
+// ===================================================
+function loadHistory() {
+  var cat  = document.getElementById('hist-cat').value;
+  var type = document.getElementById('hist-type').value;
+  var tbody = document.getElementById('history-tbody');
+  tbody.innerHTML = '<tr><td colspan="8" class="loading">読み込み中...</td></tr>';
+
+  var q = db.collection('transactions').orderBy('timestamp','desc').limit(100);
+  if (cat)  q = q.where('category','==',cat);
+  if (type) q = q.where('type','==',type);
+
+  q.get().then(function(snap) {
+    if (snap.empty) {
+      tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:1.5rem">履歴がありません</td></tr>';
+      return;
+    }
+    var rows = '';
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      var ts = d.timestamp ? new Date(d.timestamp.seconds*1000) : new Date();
+      var catLabel2 = d.category === 'materials' ? '原材料' : d.category === 'packaging' ? '包材' : '製品';
+      var typeLabel = d.type === 'in' ? '<span class="badge badge-green">入庫</span>' :
+                      d.type === 'out' ? '<span class="badge badge-blue">出庫</span>' :
+                      '<span class="badge badge-red">廃棄</span>';
+      rows += '<tr>' +
+        '<td style="white-space:nowrap;font-size:.78rem">' + fmtDate(ts) + '</td>' +
+        '<td>' + typeLabel + '</td>' +
+        '<td style="color:var(--muted);font-size:.78rem">' + catLabel2 + '</td>' +
+        '<td>' + esc(d.itemName||'') + '</td>' +
+        '<td style="font-size:.78rem;color:var(--muted)">' + esc(d.lotNo||'-') + '</td>' +
+        '<td>' + d.qty + ' ' + esc(d.unit||'') + '</td>' +
+        '<td style="font-size:.78rem;color:var(--muted)">' + esc(d.operator||'') + '</td>' +
+        '<td style="font-size:.78rem;color:var(--muted)">' + esc(d.note||'') + '</td>' +
+        '</tr>';
+    });
+    tbody.innerHTML = rows;
+  }).catch(function(e) {
+    tbody.innerHTML = '<tr><td colspan="8" style="color:var(--danger);padding:1rem">読み込みエラー: ' + e.message + '</td></tr>';
+  });
+}
+
+// ===================================================
+//  ユーティリティ
+// ===================================================
+function catLabel(cat) {
+  return cat === 'materials' ? '原材料' : cat === 'packaging' ? '包材' : '製品';
+}
+
+function fmtDate(d) {
+  var Y = d.getFullYear();
+  var M = String(d.getMonth()+1).padStart(2,'0');
+  var D = String(d.getDate()).padStart(2,'0');
+  var h = String(d.getHours()).padStart(2,'0');
+  var m = String(d.getMinutes()).padStart(2,'0');
+  return Y + '/' + M + '/' + D + ' ' + h + ':' + m;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// PWA登録
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./sw.js');
+  });
+}
+</script>
+</body>
+</html>
