@@ -11,7 +11,6 @@
 <!-- Firebase compat SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
 <style>
 /* ===== リセット & ベース ===== */
@@ -55,6 +54,24 @@ a{color:inherit;text-decoration:none}
   padding:.6rem .9rem;color:var(--text);outline:none;
 }
 .field input:focus{border-color:var(--accent)}
+/* PIN UI */
+.pin-dot{
+  width:16px;height:16px;border-radius:50%;
+  border:2px solid var(--border);background:transparent;
+  transition:background .15s,border-color .15s;
+}
+.pin-dot.filled{background:var(--accent);border-color:var(--accent)}
+.pin-dot.shake{animation:shake .3s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+.pin-key{
+  background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+  color:var(--text);font-size:1.35rem;font-weight:600;padding:.8rem;
+  transition:background .1s,transform .1s;
+}
+.pin-key:active{background:var(--accent);transform:scale(.93)}
+.pin-clear{color:var(--warn);font-size:1rem}
+.pin-del{font-size:1.1rem}
 
 /* ===== ヘッダー ===== */
 #header{
@@ -188,21 +205,37 @@ tr:hover td{background:var(--bg3)}
 </head>
 <body>
 
-<!-- ===== ログイン画面 ===== -->
+<!-- ===== ログイン画面（PIN4桁） ===== -->
 <div id="login-screen">
   <div class="login-card">
     <h1>🥘 エニクック<br>在庫管理システム</h1>
-    <p>スタッフアカウントでログインしてください</p>
-    <div class="field">
-      <label>メールアドレス</label>
-      <input type="email" id="login-email" placeholder="例: staff@anycook.jp" autocomplete="username">
+    <p>4桁の暗証番号を入力してください</p>
+
+    <!-- PIN表示ドット -->
+    <div style="display:flex;justify-content:center;gap:14px;margin:1.2rem 0">
+      <div class="pin-dot" id="dot0"></div>
+      <div class="pin-dot" id="dot1"></div>
+      <div class="pin-dot" id="dot2"></div>
+      <div class="pin-dot" id="dot3"></div>
     </div>
-    <div class="field">
-      <label>パスワード</label>
-      <input type="password" id="login-pass" autocomplete="current-password">
+
+    <!-- テンキー -->
+    <div class="pin-grid">
+      <button class="pin-key" onclick="pinKey('1')">1</button>
+      <button class="pin-key" onclick="pinKey('2')">2</button>
+      <button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button>
+      <button class="pin-key" onclick="pinKey('5')">5</button>
+      <button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button>
+      <button class="pin-key" onclick="pinKey('8')">8</button>
+      <button class="pin-key" onclick="pinKey('9')">9</button>
+      <button class="pin-key pin-clear" onclick="pinClear()">C</button>
+      <button class="pin-key" onclick="pinKey('0')">0</button>
+      <button class="pin-key pin-del" onclick="pinDel()">⌫</button>
     </div>
-    <button class="btn btn-primary btn-block" onclick="doLogin()">ログイン</button>
-    <p id="login-err" style="color:var(--danger);font-size:.8rem;text-align:center;display:none"></p>
+
+    <p id="login-err" style="color:var(--danger);font-size:.82rem;text-align:center;margin-top:.75rem;min-height:1.2em"></p>
   </div>
 </div>
 
@@ -469,58 +502,103 @@ tr:hover td{background:var(--bg3)}
 
 <script>
 // ===================================================
-//  Firebase 設定 ※ご自身のプロジェクト設定に書き換えてください
+//  Firebase 設定
 // ===================================================
 var firebaseConfig = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId:             "YOUR_APP_ID"
+  apiKey:            "AIzaSyDS72XQLIw2zGzYwrK49PID0uOxqTZigfM",
+  authDomain:        "inventory-a6bac.firebaseapp.com",
+  projectId:         "inventory-a6bac",
+  storageBucket:     "inventory-a6bac.firebasestorage.app",
+  messagingSenderId: "754262232768",
+  appId:             "1:754262232768:web:3db438db5b6e2bdbe2e725"
 };
 firebase.initializeApp(firebaseConfig);
-var db   = firebase.firestore();
-var auth = firebase.auth();
+var db = firebase.firestore();
 
 // ===================================================
 //  グローバル状態
 // ===================================================
-var currentUser   = null;
-var allItems      = { materials:{}, packaging:{}, products:{} };
+var currentUser    = 'staff';
+var allItems       = { materials:{}, packaging:{}, products:{} };
 var unsubListeners = [];
 
 // ===================================================
-//  認証
+//  PIN認証
 // ===================================================
-auth.onAuthStateChanged(function(user) {
-  if (user) {
-    currentUser = user;
+var PIN_CORRECT = '8299';
+var pinBuffer   = '';
+
+function pinKey(d) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += d;
+  updateDots();
+  if (pinBuffer.length === 4) {
+    setTimeout(checkPin, 120);
+  }
+}
+
+function pinDel() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  updateDots();
+}
+
+function pinClear() {
+  pinBuffer = '';
+  updateDots();
+  document.getElementById('login-err').textContent = '';
+}
+
+function updateDots() {
+  for (var i = 0; i < 4; i++) {
+    var dot = document.getElementById('dot' + i);
+    if (i < pinBuffer.length) {
+      dot.classList.add('filled');
+    } else {
+      dot.classList.remove('filled');
+    }
+  }
+}
+
+function checkPin() {
+  if (pinBuffer === PIN_CORRECT) {
+    sessionStorage.setItem('anycook_pin_ok', '1');
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
     startListeners();
   } else {
-    currentUser = null;
-    document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('app').style.display = 'none';
+    document.getElementById('login-err').textContent = '暗証番号が違います';
+    for (var i = 0; i < 4; i++) {
+      document.getElementById('dot' + i).classList.add('shake');
+    }
+    setTimeout(function() {
+      pinBuffer = '';
+      updateDots();
+      for (var j = 0; j < 4; j++) {
+        document.getElementById('dot' + j).classList.remove('shake');
+      }
+    }, 400);
+  }
+}
+
+// ページ読み込み時：セッション継続チェック
+window.addEventListener('DOMContentLoaded', function() {
+  if (sessionStorage.getItem('anycook_pin_ok') === '1') {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    startListeners();
   }
 });
 
-function doLogin() {
-  var email = document.getElementById('login-email').value.trim();
-  var pass  = document.getElementById('login-pass').value;
-  var err   = document.getElementById('login-err');
-  err.style.display = 'none';
-  auth.signInWithEmailAndPassword(email, pass).catch(function(e) {
-    err.textContent = 'ログインできませんでした。メールアドレスとパスワードを確認してください。';
-    err.style.display = 'block';
-  });
-}
-
 function doLogout() {
+  sessionStorage.removeItem('anycook_pin_ok');
   unsubListeners.forEach(function(u){ u(); });
   unsubListeners = [];
-  auth.signOut();
+  allItems = { materials:{}, packaging:{}, products:{} };
+  pinBuffer = '';
+  updateDots();
+  document.getElementById('login-err').textContent = '';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
 }
 
 // ===================================================
@@ -838,7 +916,7 @@ function submitIO() {
     itemName:  item ? item.name : '',
     qty:       qty,
     unit:      unit,
-    operator:  currentUser ? currentUser.email : '',
+    operator:  'スタッフ',
     note:      note,
     timestamp: firebase.firestore.FieldValue.serverTimestamp()
   };
