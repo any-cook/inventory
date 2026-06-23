@@ -1573,6 +1573,13 @@ function doGitHubPush(token,repo,path,branch,msgEl){
   .catch(function(e){msgEl.textContent='❌ '+e.message;msgEl.style.color='var(--danger)';});
 }
 
+// 初回起動時にGitHub設定のデフォルト値をlocalStorageへ保存（トークン以外）
+(function(){
+  if(!localStorage.getItem('gh_repo'))   localStorage.setItem('gh_repo','any-cook/inventory');
+  if(!localStorage.getItem('gh_path'))   localStorage.setItem('gh_path','index.html');
+  if(!localStorage.getItem('gh_branch')) localStorage.setItem('gh_branch','main');
+})();
+
 // PWA - Service Worker（強制更新）
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').then(function(reg) {
