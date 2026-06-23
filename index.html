@@ -173,6 +173,20 @@ tr:hover td{background:var(--bg3)}
   .row3{grid-template-columns:1fr 1fr}
   .water-grid{grid-template-columns:repeat(2,1fr)}
 }
+
+/* ===== 仕入先サマリー ===== */
+.sup-block{border:1px solid var(--bd);border-radius:8px;margin-bottom:.6rem;overflow:hidden}
+.sup-header{display:flex;align-items:center;justify-content:space-between;padding:.55rem .75rem;background:var(--bg3);cursor:pointer;user-select:none}
+.sup-header-name{font-size:.82rem;font-weight:700}
+.sup-header-count{font-size:.72rem;color:var(--muted)}
+.sup-header-total{font-size:.82rem;color:var(--info);font-weight:700}
+.sup-rows{display:none}
+.sup-rows.open{display:block}
+.sup-row{display:flex;align-items:center;gap:.5rem;padding:.42rem .75rem;border-top:1px solid var(--bd);font-size:.78rem}
+.sup-row-name{flex:1}
+.sup-row-qty{font-weight:700;color:var(--ok);min-width:60px;text-align:right}
+.sup-row-unit{color:var(--muted);font-size:.7rem;min-width:30px}
+.sup-row-status{min-width:52px;text-align:right}
 </style>
 </head>
 <body>
@@ -222,6 +236,7 @@ tr:hover td{background:var(--bg3)}
     <button class="tab"    onclick="go('tanaoroshi',this)">棚卸し</button>
     <button class="tab"    onclick="go('history',this)">履歴</button>
     <button class="tab"    onclick="go('master',this)">品目設定</button>
+    <button class="tab"    onclick="go('csv',this)">CSV入出力</button>
   </div>
 
   <div id="main">
@@ -342,6 +357,9 @@ tr:hover td{background:var(--bg3)}
           <option value="packaging">包材</option>
           <option value="products">製品</option>
         </select>
+        <select id="list-supplier" onchange="renderList()" style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:.5rem .6rem;color:var(--text);font-size:.78rem">
+          <option value="">仕入先：すべて</option>
+        </select>
         <button class="btn-add" onclick="openAdd()">＋ 追加</button>
       </div>
       <div class="card" style="padding:0">
@@ -421,6 +439,78 @@ tr:hover td{background:var(--bg3)}
           </table>
         </div>
       </div>
+    </div>
+
+    <!-- ======= CSV 入出力 ======= -->
+    <div id="page-csv" class="page">
+
+      <!-- エクスポート -->
+      <div class="card">
+        <div class="ctitle">📤 CSVエクスポート</div>
+        <div class="fg">
+          <label>対象カテゴリ</label>
+          <select id="csv-exp-cat">
+            <option value="materials">原材料</option>
+            <option value="packaging">包材</option>
+            <option value="products">製品</option>
+            <option value="all">すべて（3カテゴリ合算）</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>仕入先で絞込（任意）</label>
+          <select id="csv-exp-sup">
+            <option value="">すべての仕入先</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.25rem">
+          <button class="btn-rec" style="margin:0;flex:1;min-width:140px" onclick="exportMasterCSV()">在庫マスターをDL</button>
+          <button class="btn-rec" style="margin:0;flex:1;min-width:140px;background:var(--info)" onclick="exportHistCSV()">入出庫履歴をDL</button>
+        </div>
+        <div style="margin-top:.75rem;padding:.6rem .75rem;background:var(--bg3);border-radius:8px;font-size:.75rem;color:var(--muted);line-height:1.7">
+          在庫マスター CSV：品名 / カテゴリ / 単位 / 現在在庫 / 安全在庫 / 発注点 / 仕入先 / 管理方式 / ABCランク<br>
+          入出庫履歴 CSV：日時 / 区分 / 品名 / カテゴリ / 入庫数 / 出庫数 / 調整後在庫 / ロット / 備考
+        </div>
+      </div>
+
+      <!-- 仕入先別サマリー -->
+      <div class="card">
+        <div class="ctitle">🏭 仕入先別 在庫サマリー</div>
+        <div class="fg" style="margin-bottom:.75rem">
+          <label>カテゴリ</label>
+          <select id="csv-sup-cat" onchange="renderSupplierSummary()">
+            <option value="materials">原材料</option>
+            <option value="packaging">包材</option>
+            <option value="products">製品</option>
+            <option value="all">すべて</option>
+          </select>
+        </div>
+        <div id="supplier-summary"></div>
+        <button class="btn-rec" style="margin-top:.6rem;background:var(--bg3);color:var(--text);border:1px solid var(--bd)" onclick="exportSupplierCSV()">仕入先別サマリーをCSVでDL</button>
+      </div>
+
+      <!-- インポート -->
+      <div class="card">
+        <div class="ctitle">📥 CSVインポート（在庫マスター一括登録）</div>
+        <div style="padding:.6rem .75rem;background:var(--bg3);border-radius:8px;font-size:.75rem;color:var(--muted);line-height:1.7;margin-bottom:.75rem">
+          <strong style="color:var(--text)">CSVフォーマット（1行目はヘッダー）</strong><br>
+          品名,カテゴリ,単位,現在在庫,安全在庫,発注点,仕入先,管理方式,ABCランク<br>
+          カテゴリ：materials / packaging / products<br>
+          管理方式：3col / dbin　　ABCランク：A / B / C
+        </div>
+        <button class="btn-rec" style="margin:0 0 .6rem;background:var(--bg3);color:var(--text);border:1px solid var(--bd)" onclick="downloadTemplate()">テンプレートCSVをDL</button>
+        <div class="fg">
+          <label>CSVファイルを選択</label>
+          <input type="file" id="csv-file" accept=".csv" style="background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:.5rem;color:var(--text)">
+        </div>
+        <div id="csv-preview" style="display:none;margin:.5rem 0">
+          <div class="ctitle" style="margin-bottom:.5rem">プレビュー（先頭5件）</div>
+          <div class="tbl-wrap" id="csv-preview-wrap"></div>
+          <div id="csv-preview-count" style="font-size:.75rem;color:var(--muted);margin-top:.4rem"></div>
+        </div>
+        <button class="btn-rec" id="csv-import-btn" style="margin-top:.25rem;display:none" onclick="importCSV()">この内容でインポートする</button>
+        <span id="csv-msg" style="display:block;text-align:center;font-size:.8rem;margin-top:.4rem"></span>
+      </div>
+
     </div>
 
   </div><!-- /main -->
@@ -582,6 +672,7 @@ function startApp(){
       renderList();
       renderMaster();
       loadIoItems();
+      refreshSupplierSelects();
     });
     unsubs.push(u);
   });
@@ -599,6 +690,7 @@ function go(name,el){
   if(name==='history') loadHist();
   if(name==='tanaoroshi') renderTana();
   if(name==='io') loadIoItems();
+  if(name==='csv'){ renderSupplierSummary(); refreshSupplierSelects(); }
 }
 
 // ===================================================
@@ -996,6 +1088,344 @@ function fmtDt(d){
 }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function showMsg(el,txt,color){ el.textContent=txt; el.style.color=color; }
+
+// ===================================================
+//  仕入先リスト更新（全セレクトを同期）
+// ===================================================
+function refreshSupplierSelects(){
+  var sups=new Set();
+  ['materials','packaging','products'].forEach(function(c){
+    Object.values(items[c]).forEach(function(i){ if(i.supplier&&i.supplier.trim()) sups.add(i.supplier.trim()); });
+  });
+  var supArr=Array.from(sups).sort(function(a,b){return a.localeCompare(b,'ja');});
+  ['list-supplier','csv-exp-sup'].forEach(function(sid){
+    var sel=document.getElementById(sid); if(!sel) return;
+    var cur=sel.value;
+    sel.innerHTML='<option value="">'+(sid==='list-supplier'?'仕入先：すべて':'すべての仕入先')+'</option>';
+    supArr.forEach(function(s){
+      var o=document.createElement('option');
+      o.value=s; o.textContent=s;
+      if(s===cur) o.selected=true;
+      sel.appendChild(o);
+    });
+  });
+}
+
+// ===================================================
+//  在庫一覧（仕入先フィルター対応版）
+// ===================================================
+function renderList(){
+  refreshSupplierSelects();
+  var q=(document.getElementById('list-q').value||'').toLowerCase();
+  var cat=document.getElementById('list-cat').value;
+  var sup=(document.getElementById('list-supplier').value||'');
+  var tbody=document.getElementById('list-tbody');
+  var arr=[];
+  var cats=cat?[cat]:['materials','packaging','products'];
+  cats.forEach(function(c){ arr=arr.concat(Object.values(items[c]).map(function(i){return Object.assign({_cat:c},i);})); });
+  if(q)   arr=arr.filter(function(i){return (i.name||'').toLowerCase().indexOf(q)!==-1;});
+  if(sup) arr=arr.filter(function(i){return (i.supplier||'')=== sup;});
+  arr.sort(function(a,b){
+    var sa=(a.supplier||'zzz'), sb=(b.supplier||'zzz');
+    if(sa!==sb) return sa.localeCompare(sb,'ja');
+    return (a.name||'').localeCompare(b.name||'','ja');
+  });
+  if(!arr.length){tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:1.5rem">品目なし</td></tr>';return;}
+  var rows='', lastSup='__NONE__';
+  arr.forEach(function(item){
+    var sup2=item.supplier||'（仕入先未設定）';
+    if(sup2!==lastSup){
+      rows+='<tr><td colspan="7" style="background:var(--bg3);padding:.35rem .6rem;font-size:.72rem;font-weight:700;color:var(--info)">🏭 '+esc(sup2)+'</td></tr>';
+      lastSup=sup2;
+    }
+    var qty=item.currentQty||0, rp=item.reorderPoint||0, ss=item.safetyStock||0;
+    var sb=qty<=rp&&rp>0?'<span class="b b-danger">発注要</span>':qty<=ss&&ss>0?'<span class="b b-warn">警告</span>':'<span class="b b-ok">正常</span>';
+    var mgmtb=item.mgmt==='dbin'?'<span class="dbin">ダブルビン</span>':'<span class="b b-gray">3欄式</span>';
+    rows+='<tr><td style="padding-left:1.2rem"><strong>'+esc(item.name||'')+'</strong></td>'
+      +'<td><span class="b b-gray">'+CAT_LABEL[item._cat]+'</span></td>'
+      +'<td><strong>'+qty+'</strong> <span style="color:var(--muted);font-size:.7rem">'+esc(item.unit||'')+'</span></td>'
+      +'<td style="color:var(--muted)">'+rp+'</td>'
+      +'<td>'+sb+'</td>'
+      +'<td>'+mgmtb+'</td>'
+      +'<td><button onclick="openEdit(\''+item._cat+'\',\''+item.id+'\')" style="background:transparent;border:1px solid var(--bd);border-radius:6px;padding:.25rem .55rem;color:var(--muted);font-size:.72rem">編集</button></td>'
+      +'</tr>';
+  });
+  tbody.innerHTML=rows;
+}
+
+// ===================================================
+//  仕入先別サマリー
+// ===================================================
+function renderSupplierSummary(){
+  refreshSupplierSelects();
+  var cat=document.getElementById('csv-sup-cat').value;
+  var cats=cat==='all'?['materials','packaging','products']:[cat];
+  var map={};
+  cats.forEach(function(c){
+    Object.values(items[c]).forEach(function(item){
+      var s=item.supplier&&item.supplier.trim()?item.supplier.trim():'（仕入先未設定）';
+      if(!map[s]) map[s]={items:[],totalItems:0};
+      map[s].items.push(Object.assign({_cat:c},item));
+      map[s].totalItems++;
+    });
+  });
+  var supArr=Object.keys(map).sort(function(a,b){return a.localeCompare(b,'ja');});
+  var el=document.getElementById('supplier-summary');
+  if(!supArr.length){el.innerHTML='<div style="color:var(--muted);font-size:.8rem">データなし</div>';return;}
+  el.innerHTML=supArr.map(function(s){
+    var group=map[s];
+    var alertCount=group.items.filter(function(i){return (i.currentQty||0)<=(i.reorderPoint||0)&&(i.reorderPoint||0)>0;}).length;
+    var alertBadge=alertCount>0?'<span class="b b-danger">発注要 '+alertCount+'品目</span>':'<span class="b b-ok">正常</span>';
+    var rows=group.items.map(function(item){
+      var qty=item.currentQty||0, rp=item.reorderPoint||0;
+      var sb=qty<=rp&&rp>0?'<span class="b b-danger">発注要</span>':qty<=(item.safetyStock||0)&&(item.safetyStock||0)>0?'<span class="b b-warn">警告</span>':'<span class="b b-ok">正常</span>';
+      return '<div class="sup-row">'
+        +'<span class="sup-row-name">'+esc(item.name||'')+'<span style="font-size:.68rem;color:var(--muted);margin-left:.4rem">'+CAT_LABEL[item._cat]+'</span></span>'
+        +'<span class="sup-row-qty">'+qty+'</span>'
+        +'<span class="sup-row-unit">'+esc(item.unit||'')+'</span>'
+        +'<span class="sup-row-status">'+sb+'</span>'
+        +'</div>';
+    }).join('');
+    var uid='sup-'+s.replace(/[^a-zA-Z0-9]/g,'_');
+    return '<div class="sup-block">'
+      +'<div class="sup-header" onclick="toggleSup(\''+uid+'\')">'
+        +'<span class="sup-header-name">🏭 '+esc(s)+'</span>'
+        +'<span class="sup-header-count">'+group.totalItems+'品目</span>'
+        +'<span>'+alertBadge+'</span>'
+      +'</div>'
+      +'<div class="sup-rows" id="'+uid+'">'+rows+'</div>'
+      +'</div>';
+  }).join('');
+}
+function toggleSup(id){
+  var el=document.getElementById(id); if(!el) return;
+  el.classList.toggle('open');
+}
+
+// ===================================================
+//  CSV エクスポート：在庫マスター
+// ===================================================
+function exportMasterCSV(){
+  var cat=document.getElementById('csv-exp-cat').value;
+  var sup=document.getElementById('csv-exp-sup').value;
+  var cats=cat==='all'?['materials','packaging','products']:[cat];
+  var rows=[['品名','カテゴリ','単位','現在在庫','安全在庫','発注点','仕入先','管理方式','ABCランク']];
+  cats.forEach(function(c){
+    var arr=Object.values(items[c]);
+    arr.sort(function(a,b){return (a.supplier||'').localeCompare(b.supplier||'','ja')||((a.name||'').localeCompare(b.name||'','ja'));});
+    arr.forEach(function(item){
+      if(sup&&(item.supplier||'')!==sup) return;
+      rows.push([
+        item.name||'', CAT_LABEL[c], item.unit||'',
+        item.currentQty||0, item.safetyStock||0, item.reorderPoint||0,
+        item.supplier||'', item.mgmt||'3col', item.abcRank||'C'
+      ]);
+    });
+  });
+  var label=cat==='all'?'全カテゴリ':CAT_LABEL[cat];
+  dlCSV(rows, 'エニクック在庫マスター_'+label+'_'+fmtDate(new Date())+'.csv');
+}
+
+// ===================================================
+//  CSV エクスポート：入出庫履歴
+// ===================================================
+function exportHistCSV(){
+  var cat=document.getElementById('csv-exp-cat').value;
+  var sup=document.getElementById('csv-exp-sup').value;
+  var cats=cat==='all'?['materials','packaging','products']:[cat];
+  var msg=document.getElementById('csv-msg');
+  showMsg(msg,'履歴を取得中...','var(--muted)');
+  var q=db.collection('transactions').orderBy('timestamp','desc').limit(2000);
+  if(cat!=='all') q=q.where('category','==',cat);
+  q.get().then(function(snap){
+    var rows=[['日時','区分','品名','カテゴリ','入庫数','出庫数','廃棄数','調整後在庫','ロット番号','備考','仕入先']];
+    snap.forEach(function(d){
+      var tx=d.data();
+      if(!cats.includes(tx.category)) return;
+      // 仕入先フィルター
+      var itemSup='';
+      if(items[tx.category]&&items[tx.category][tx.itemId]) itemSup=items[tx.category][tx.itemId].supplier||'';
+      if(sup&&itemSup!==sup) return;
+      var ts=tx.timestamp?new Date(tx.timestamp.seconds*1000):new Date();
+      var inQ=tx.type==='in'?tx.qty:'';
+      var outQ=tx.type==='out'?tx.qty:'';
+      var disQ=tx.type==='discard'?tx.qty:'';
+      rows.push([
+        fmtDt(ts), TYPE_LABEL[tx.type]||tx.type, tx.itemName||'',
+        CAT_LABEL[tx.category]||tx.category,
+        inQ, outQ, disQ,
+        tx.afterQty!==undefined?tx.afterQty:'',
+        tx.lotNo||'', tx.note||'', itemSup
+      ]);
+    });
+    var label=cat==='all'?'全カテゴリ':CAT_LABEL[cat];
+    dlCSV(rows,'エニクック入出庫履歴_'+label+'_'+fmtDate(new Date())+'.csv');
+    showMsg(msg,'✅ ダウンロードしました（'+(rows.length-1)+'件）','var(--ok)');
+    setTimeout(function(){msg.textContent='';},4000);
+  }).catch(function(e){showMsg(msg,'❌ '+e.message,'var(--danger)');});
+}
+
+// ===================================================
+//  CSV エクスポート：仕入先別サマリー
+// ===================================================
+function exportSupplierCSV(){
+  var cat=document.getElementById('csv-sup-cat').value;
+  var cats=cat==='all'?['materials','packaging','products']:[cat];
+  var rows=[['仕入先','品名','カテゴリ','単位','現在在庫','安全在庫','発注点','状態','管理方式','ABCランク']];
+  var map={};
+  cats.forEach(function(c){
+    Object.values(items[c]).forEach(function(item){
+      var s=item.supplier&&item.supplier.trim()?item.supplier.trim():'（仕入先未設定）';
+      if(!map[s]) map[s]=[];
+      map[s].push(Object.assign({_cat:c},item));
+    });
+  });
+  Object.keys(map).sort(function(a,b){return a.localeCompare(b,'ja');}).forEach(function(s){
+    map[s].sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ja');}).forEach(function(item){
+      var qty=item.currentQty||0, rp=item.reorderPoint||0, ss=item.safetyStock||0;
+      var status=qty<=rp&&rp>0?'発注要':qty<=ss&&ss>0?'警告':'正常';
+      rows.push([s, item.name||'', CAT_LABEL[item._cat], item.unit||'', qty, ss, rp, status, item.mgmt||'3col', item.abcRank||'C']);
+    });
+  });
+  dlCSV(rows,'エニクック仕入先別在庫_'+fmtDate(new Date())+'.csv');
+}
+
+// ===================================================
+//  CSVテンプレートDL
+// ===================================================
+function downloadTemplate(){
+  var rows=[
+    ['品名','カテゴリ','単位','現在在庫','安全在庫','発注点','仕入先','管理方式','ABCランク'],
+    ['有機トマトペースト','materials','kg','50','10','20','日本食研','3col','A'],
+    ['レトルトパウチ200ml','packaging','枚','500','100','200','東洋製罐','dbin','C'],
+    ['つくしちゃんカレー','products','個','30','5','10','','3col','A']
+  ];
+  dlCSV(rows,'エニクック在庫マスター_テンプレート.csv');
+}
+
+// ===================================================
+//  CSV インポート
+// ===================================================
+var csvParsedData=[];
+document.addEventListener('DOMContentLoaded',function(){
+  var fi=document.getElementById('csv-file');
+  if(!fi) return;
+  fi.addEventListener('change',function(e){
+    var file=e.target.files[0]; if(!file) return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var text=ev.target.result;
+      csvParsedData=parseCSV(text);
+      showCSVPreview(csvParsedData);
+    };
+    reader.readAsText(file,'UTF-8');
+  });
+});
+
+function parseCSV(text){
+  var lines=text.split(/\r?\n/).filter(function(l){return l.trim();});
+  return lines.map(function(line){
+    var result=[], cur='', inQ=false;
+    for(var i=0;i<line.length;i++){
+      var c=line[i];
+      if(c==='"'){inQ=!inQ;}
+      else if(c===','&&!inQ){result.push(cur.trim());cur='';}
+      else{cur+=c;}
+    }
+    result.push(cur.trim());
+    return result;
+  });
+}
+
+function showCSVPreview(rows){
+  if(rows.length<2){
+    document.getElementById('csv-preview').style.display='none';
+    document.getElementById('csv-import-btn').style.display='none';
+    return;
+  }
+  var header=rows[0];
+  var preview=rows.slice(1,6);
+  var tbl='<table><thead><tr>'+header.map(function(h){return '<th>'+esc(h)+'</th>';}).join('')+'</tr></thead><tbody>';
+  tbl+=preview.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+esc(c)+'</td>';}).join('')+'</tr>';}).join('');
+  tbl+='</tbody></table>';
+  document.getElementById('csv-preview-wrap').innerHTML=tbl;
+  document.getElementById('csv-preview-count').textContent='全 '+(rows.length-1)+' 件（ヘッダー除く）';
+  document.getElementById('csv-preview').style.display='block';
+  document.getElementById('csv-import-btn').style.display='block';
+}
+
+function importCSV(){
+  if(!csvParsedData||csvParsedData.length<2){return;}
+  var msg=document.getElementById('csv-msg');
+  var header=csvParsedData[0];
+  var colIdx={};
+  ['品名','カテゴリ','単位','現在在庫','安全在庫','発注点','仕入先','管理方式','ABCランク'].forEach(function(h){
+    var i=header.indexOf(h);
+    colIdx[h]=i;
+  });
+  if(colIdx['品名']<0||colIdx['カテゴリ']<0||colIdx['単位']<0){
+    showMsg(msg,'❌ ヘッダーが正しくありません（品名・カテゴリ・単位は必須）','var(--danger)');return;
+  }
+  var rows=csvParsedData.slice(1).filter(function(r){return r[colIdx['品名']]&&r[colIdx['品名']].trim();});
+  if(!rows.length){showMsg(msg,'インポートするデータがありません','var(--warn)');return;}
+
+  var catMap={'materials':'materials','packaging':'packaging','products':'products',
+              '原材料':'materials','包材':'packaging','製品':'products'};
+  var batch=db.batch();
+  var count=0, err=[];
+  rows.forEach(function(r,idx){
+    var name=(r[colIdx['品名']]||'').trim();
+    var catRaw=(r[colIdx['カテゴリ']]||'').trim();
+    var cat=catMap[catRaw];
+    var unit=(r[colIdx['単位']]||'').trim();
+    if(!cat){err.push((idx+2)+'行目: カテゴリ「'+catRaw+'」が無効');return;}
+    if(!unit){err.push((idx+2)+'行目: 単位が未入力');return;}
+    var data={
+      name:name, unit:unit,
+      currentQty:parseFloat(r[colIdx['現在在庫']])||0,
+      safetyStock:parseFloat(r[colIdx['安全在庫']])||0,
+      reorderPoint:parseFloat(r[colIdx['発注点']])||0,
+      supplier:(r[colIdx['仕入先']]||'').trim(),
+      mgmt:(r[colIdx['管理方式']]||'3col').trim()||'3col',
+      abcRank:(r[colIdx['ABCランク']]||'C').trim()||'C',
+      updatedAt:FS.serverTimestamp(), createdAt:FS.serverTimestamp()
+    };
+    batch.set(db.collection(cat).doc(), data);
+    count++;
+  });
+  if(err.length){showMsg(msg,'⚠️ '+err.join(' / '),'var(--warn)');return;}
+  batch.commit().then(function(){
+    showMsg(msg,'✅ '+count+'品目をインポートしました','var(--ok)');
+    csvParsedData=[];
+    document.getElementById('csv-file').value='';
+    document.getElementById('csv-preview').style.display='none';
+    document.getElementById('csv-import-btn').style.display='none';
+  }).catch(function(e){showMsg(msg,'❌ '+e.message,'var(--danger)');});
+}
+
+// ===================================================
+//  CSV ダウンロードヘルパー
+// ===================================================
+function dlCSV(rows, filename){
+  var bom='\uFEFF';
+  var csv=bom+rows.map(function(r){
+    return r.map(function(c){
+      var s=String(c===null||c===undefined?'':c);
+      if(s.indexOf(',')!==-1||s.indexOf('"')!==-1||s.indexOf('\n')!==-1){
+        return '"'+s.replace(/"/g,'""')+'"';
+      }
+      return s;
+    }).join(',');
+  }).join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+}
+function fmtDate(d){
+  return d.getFullYear()+(d.getMonth()+1+'').padStart(2,'0')+(d.getDate()+'').padStart(2,'0');
+}
 
 // PWA
 if('serviceWorker'in navigator) navigator.serviceWorker.register('./sw.js');
