@@ -560,21 +560,30 @@ tr:hover td{background:#f5f3ff}
         <input type="number" id="m-reorder" min="0" step="0.01" placeholder="0">
       </div>
     </div>
-    <div class="row2" style="gap:.6rem;margin-bottom:.6rem">
-      <div class="fg" style="margin:0">
+    <div style="gap:.6rem;margin-bottom:.6rem">
+      <div class="fg">
         <label>管理方式</label>
         <select id="m-mgmt">
           <option value="3col">3欄式（入出庫記録）</option>
           <option value="dbin">ダブルビン（包材など）</option>
         </select>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:.3rem;line-height:1.6;background:var(--bg3);border-radius:8px;padding:.5rem .7rem">
+          <strong style="color:var(--text)">3欄式</strong>　入庫・出庫・在庫数を毎回記録。原材料など正確な数量管理が必要な品目に。<br>
+          <strong style="color:var(--text)">ダブルビン</strong>　2箱ひと組で運用し、1箱使い切ったら発注するシンプル方式。袋・ラベルなど消耗品の包材向き。
+        </div>
       </div>
-      <div class="fg" style="margin:0">
+      <div class="fg">
         <label>ABCランク</label>
         <select id="m-abc">
-          <option value="A">A（高単価・重要品）</option>
-          <option value="B">B（中間）</option>
-          <option value="C" selected>C（安価・副資材）</option>
+          <option value="A">A（高単価・重点管理）</option>
+          <option value="B">B（中程度・通常管理）</option>
+          <option value="C" selected>C（低単価・簡易管理）</option>
         </select>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:.3rem;line-height:1.6;background:var(--bg3);border-radius:8px;padding:.5rem .7rem">
+          <strong style="color:var(--danger)">A ランク</strong>　使用金額が大きい・欠品が製造に直結する最重要品目。発注点・安全在庫を厳密に設定し頻繁にチェック。<br>
+          <strong style="color:var(--warn)">B ランク</strong>　AとCの中間。定期的に在庫を確認し、月1回程度まとめて発注。<br>
+          <strong style="color:var(--ok)">C ランク</strong>　単価が低く欠品しても影響が小さい副資材など。まとめ買い・目視確認で十分。
+        </div>
       </div>
     </div>
     <div class="fg">
