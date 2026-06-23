@@ -229,7 +229,10 @@ tr:hover td{background:#f5f3ff}
       <span class="logo">エニクック <span>在庫管理</span></span>
       <span id="abadge">!</span>
     </div>
-    <button class="btn-logout" onclick="logout()">ログアウト</button>
+    <div style="display:flex;gap:.5rem;align-items:center">
+      <button onclick="pushToGitHub()" style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:.4rem .85rem;font-size:.78rem;font-weight:800;cursor:pointer" title="GitHubへ自動アップロード">⬆ GitHub</button>
+      <button class="btn-logout" onclick="logout()">ログアウト</button>
+    </div>
   </div>
 
   <div id="tabs">
@@ -519,6 +522,41 @@ tr:hover td{background:#f5f3ff}
   </div><!-- /main -->
 </div><!-- /app -->
 
+<!-- ===== GitHub設定モーダル ===== -->
+<div class="modal-bg hide" id="gh-modal">
+  <div class="modal" style="max-width:420px;border-radius:20px;margin:auto">
+    <div class="modal-hd">
+      <span class="modal-title">⬆ GitHub 自動アップロード設定</span>
+      <button class="modal-close" onclick="document.getElementById('gh-modal').classList.add('hide')">&times;</button>
+    </div>
+    <div style="font-size:.82rem;color:var(--muted);line-height:1.7;margin-bottom:.9rem;background:var(--bg3);border-radius:10px;padding:.7rem .85rem">
+      GitHub Personal Access Token（PAT）を保存すると、ボタン1つでこのブラウザから直接GitHubにアップロードできます。<br>
+      <strong style="color:var(--text)">取得方法：</strong> GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token → <code>repo</code>にチェック
+    </div>
+    <div class="fg">
+      <label>Personal Access Token</label>
+      <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+    </div>
+    <div class="fg">
+      <label>リポジトリ（オーナー/リポ名）</label>
+      <input type="text" id="gh-repo" value="any-cook/inventory" placeholder="any-cook/inventory">
+    </div>
+    <div class="fg">
+      <label>ファイルパス</label>
+      <input type="text" id="gh-path" value="index.html" placeholder="index.html">
+    </div>
+    <div class="fg">
+      <label>ブランチ</label>
+      <input type="text" id="gh-branch" value="main" placeholder="main">
+    </div>
+    <div style="display:flex;gap:.6rem;margin-top:.5rem">
+      <button class="btn-rec" style="margin:0" onclick="saveGhSettings()">保存してアップロード</button>
+      <button style="flex:0 0 auto;padding:.6rem 1rem;border-radius:8px;background:transparent;border:1px solid var(--bd);color:var(--text)" onclick="document.getElementById('gh-modal').classList.add('hide')">キャンセル</button>
+    </div>
+    <div id="gh-msg" style="margin-top:.5rem;font-size:.82rem;font-weight:700;text-align:center;min-height:1.4em"></div>
+  </div>
+</div>
+
 <!-- ===== 品目登録・編集モーダル ===== -->
 <div class="modal-bg hide" id="item-modal">
   <div class="modal">
@@ -531,7 +569,7 @@ tr:hover td{background:#f5f3ff}
     <div class="row2" style="gap:.6rem;margin-bottom:.6rem">
       <div class="fg" style="margin:0">
         <label>カテゴリ *</label>
-        <select id="m-cat-sel">
+        <select id="m-cat-sel" onchange="syncModalFields()">
           <option value="materials">原材料</option>
           <option value="packaging">包材</option>
           <option value="products">製品</option>
@@ -1047,6 +1085,11 @@ function renderMaster(){
 // ===================================================
 //  品目モーダル
 // ===================================================
+function syncModalFields(){
+  var v=document.getElementById('m-cat-sel').value;
+  document.getElementById('m-expiry-row').style.display=v==='products'?'block':'none';
+  document.getElementById('m-capacity-row').style.display=v==='packaging'?'block':'none';
+}
 function openAdd(){
   document.getElementById('m-id').value='';
   document.getElementById('m-title').textContent='品目を新規登録';
@@ -1060,14 +1103,10 @@ function openAdd(){
   document.getElementById('m-supplier').value='';
   document.getElementById('m-capacity').value='';
   document.getElementById('m-capacity-unit').value='';
-  document.getElementById('m-capacity-row').style.display='none';
   document.getElementById('m-edays').value='';
-  document.getElementById('m-expiry-row').style.display='none';
+  document.getElementById('m-cat-sel').value='materials';
+  syncModalFields();
   document.getElementById('item-modal').classList.remove('hide');
-  document.getElementById('m-cat-sel').addEventListener('change',function(){
-    document.getElementById('m-expiry-row').style.display=this.value==='products'?'block':'none';
-    document.getElementById('m-capacity-row').style.display=this.value==='packaging'?'block':'none';
-  });
 }
 function openEdit(cat,id){
   var item=items[cat][id]; if(!item) return;
@@ -1464,6 +1503,71 @@ function dlCSV(rows, filename){
 }
 function fmtDate(d){
   return d.getFullYear()+(d.getMonth()+1+'').padStart(2,'0')+(d.getDate()+'').padStart(2,'0');
+}
+
+// ===================================================
+//  GitHub 自動アップロード
+// ===================================================
+function pushToGitHub(){
+  var token=localStorage.getItem('gh_token');
+  var repo=localStorage.getItem('gh_repo')||'any-cook/inventory';
+  var path=localStorage.getItem('gh_path')||'index.html';
+  var branch=localStorage.getItem('gh_branch')||'main';
+  // 設定モーダルを開く（値を復元）
+  document.getElementById('gh-token').value=token||'';
+  document.getElementById('gh-repo').value=repo;
+  document.getElementById('gh-path').value=path;
+  document.getElementById('gh-branch').value=branch;
+  document.getElementById('gh-msg').textContent='';
+  document.getElementById('gh-modal').classList.remove('hide');
+}
+function saveGhSettings(){
+  var token=document.getElementById('gh-token').value.trim();
+  var repo=document.getElementById('gh-repo').value.trim();
+  var path=document.getElementById('gh-path').value.trim();
+  var branch=document.getElementById('gh-branch').value.trim();
+  var msg=document.getElementById('gh-msg');
+  if(!token){msg.textContent='トークンを入力してください';msg.style.color='var(--danger)';return;}
+  localStorage.setItem('gh_token',token);
+  localStorage.setItem('gh_repo',repo);
+  localStorage.setItem('gh_path',path);
+  localStorage.setItem('gh_branch',branch);
+  msg.textContent='アップロード中...';msg.style.color='var(--muted)';
+  doGitHubPush(token,repo,path,branch,msg);
+}
+function doGitHubPush(token,repo,path,branch,msgEl){
+  var apiBase='https://api.github.com/repos/'+repo+'/contents/'+path;
+  var headers={'Authorization':'token '+token,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'};
+  // まず現在のSHAを取得
+  fetch(apiBase+'?ref='+branch,{headers:headers})
+  .then(function(r){return r.json();})
+  .then(function(info){
+    if(!info.sha){msgEl.textContent='SHA取得失敗: '+( info.message||'');msgEl.style.color='var(--danger)';return;}
+    // 現在のHTMLを取得してbase64エンコード
+    fetch(location.href)
+    .then(function(r){return r.text();})
+    .then(function(html){
+      var b64=btoa(unescape(encodeURIComponent(html)));
+      var body=JSON.stringify({
+        message:'chore: update inventory system '+(new Date().toISOString().slice(0,16).replace('T',' ')),
+        content:b64,
+        sha:info.sha,
+        branch:branch
+      });
+      return fetch(apiBase,{method:'PUT',headers:headers,body:body});
+    })
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(res.commit){
+        msgEl.textContent='✅ アップロード完了！';msgEl.style.color='var(--ok)';
+        setTimeout(function(){document.getElementById('gh-modal').classList.add('hide');},1500);
+      } else {
+        msgEl.textContent='❌ '+(res.message||'不明なエラー');msgEl.style.color='var(--danger)';
+      }
+    })
+    .catch(function(e){msgEl.textContent='❌ '+e.message;msgEl.style.color='var(--danger)';});
+  })
+  .catch(function(e){msgEl.textContent='❌ '+e.message;msgEl.style.color='var(--danger)';});
 }
 
 // PWA - Service Worker（強制更新）
