@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // PIN認証はフロント側のみ。Firestoreは全読み書きを許可。
+    // ※ 社内システムのため、インターネット非公開運用を前提とする。
+    // ※ 公開する場合は request.auth 等で制限を追加すること。
+
+    match /materials/{id} {
+      allow read, write: if true;
+      match /lots/{lotId} { allow read, write: if true; }
+    }
+    match /packaging/{id} {
+      allow read, write: if true;
+      match /lots/{lotId} { allow read, write: if true; }
+    }
+    match /products/{id} {
+      allow read, write: if true;
+      match /lots/{lotId} { allow read, write: if true; }
+    }
+    match /transactions/{id} {
+      allow read, create: if true;
+      allow update, delete: if false;
+    }
+  }
+}

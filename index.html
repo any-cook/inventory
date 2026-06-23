@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0c1220">
+<title>在庫管理 | エニクック</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="shortcut icon" href="favicon.ico">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:    #0c1220;
+  --bg2:   #162032;
+  --bg3:   #1e2d42;
+  --bd:    #263548;
+  --text:  #e2eaf4;
+  --muted: #7a93b0;
+  --ok:    #06b06a;
+  --warn:  #f59e0b;
+  --danger:#ef4444;
+  --info:  #38bdf8;
+  --r:     10px;
+  --font:  'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
+}
+html{font-size:15px;-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100dvh;display:flex;flex-direction:column}
+button{cursor:pointer;font-family:var(--font);font-size:inherit;border:none}
+input,select{font-family:var(--font);font-size:inherit}
+
+/* ===== PIN ログイン ===== */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100dvh;padding:1.5rem}
+.pin-card{background:var(--bg2);border:1px solid var(--bd);border-radius:16px;padding:2rem 1.75rem;width:100%;max-width:320px;display:flex;flex-direction:column;align-items:center;gap:1.25rem}
+.pin-card h1{font-size:1.1rem;font-weight:700;text-align:center;line-height:1.5}
+.pin-card p{font-size:.8rem;color:var(--muted);text-align:center}
+.pin-dots{display:flex;gap:14px}
+.dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--bd);background:transparent;transition:background .12s,border-color .12s}
+.dot.on{background:var(--ok);border-color:var(--ok)}
+.dot.shake{animation:shake .3s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem;width:100%}
+.pk{background:var(--bg3);border:1px solid var(--bd);border-radius:10px;color:var(--text);font-size:1.4rem;font-weight:700;padding:.8rem;transition:background .1s,transform .08s}
+.pk:active{background:var(--ok);transform:scale(.92)}
+.pk.c{color:var(--warn);font-size:.9rem}
+.pk.d{font-size:1rem}
+#pin-err{color:var(--danger);font-size:.78rem;min-height:1.1em}
+
+/* ===== ヘッダー ===== */
+#hdr{background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;position:sticky;top:0;z-index:100}
+.logo{font-weight:700;font-size:.95rem;color:var(--ok)}
+.logo span{color:var(--muted);font-weight:400;font-size:.8rem;margin-left:.4rem}
+#abadge{background:var(--danger);color:#fff;border-radius:9999px;padding:.12rem .5rem;font-size:.68rem;font-weight:700;display:none;margin-left:.5rem}
+.btn-logout{background:transparent;border:1px solid var(--bd);color:var(--muted);border-radius:7px;padding:.35rem .8rem;font-size:.75rem}
+.btn-logout:hover{border-color:var(--muted)}
+
+/* ===== タブ ===== */
+#tabs{display:flex;overflow-x:auto;background:var(--bg2);border-bottom:1px solid var(--bd);scrollbar-width:none}
+#tabs::-webkit-scrollbar{display:none}
+.tab{flex-shrink:0;padding:.65rem 1rem;font-size:.8rem;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;white-space:nowrap;transition:color .12s,border-color .12s}
+.tab.on{color:var(--ok);border-bottom-color:var(--ok)}
+
+/* ===== メイン ===== */
+#main{flex:1;padding:1rem;max-width:860px;margin:0 auto;width:100%}
+.page{display:none}.page.on{display:block}
+
+/* ===== カード ===== */
+.card{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:1rem;margin-bottom:.85rem}
+.ctitle{font-size:.72rem;color:var(--muted);font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.75rem}
+
+/* ===== 水位計カード ===== */
+.water-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.7rem;margin-bottom:.85rem}
+.wcard{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:.85rem;position:relative;overflow:hidden}
+.wcard-name{font-size:.75rem;color:var(--muted);margin-bottom:.5rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wcard-qty{font-size:1.6rem;font-weight:700;line-height:1;margin-bottom:.2rem}
+.wcard-unit{font-size:.7rem;color:var(--muted)}
+.wbar-wrap{height:6px;background:var(--bg3);border-radius:9999px;margin-top:.6rem;overflow:hidden}
+.wbar{height:100%;border-radius:9999px;transition:width .4s}
+.wcard.ok .wcard-qty{color:var(--ok)}
+.wcard.ok .wbar{background:var(--ok)}
+.wcard.warn .wcard-qty{color:var(--warn)}
+.wcard.warn .wbar{background:var(--warn)}
+.wcard.danger .wcard-qty{color:var(--danger)}
+.wcard.danger .wbar{background:var(--danger)}
+
+/* ===== アラート ===== */
+.al{display:flex;align-items:center;gap:.6rem;padding:.6rem .75rem;border-radius:8px;margin-bottom:.4rem;font-size:.8rem}
+.al.reorder{background:#7f1d1d22;border:1px solid #7f1d1d}
+.al.expiry{background:#78350f22;border:1px solid #92400e}
+.al.icon{font-size:1rem;flex-shrink:0}
+
+/* ===== 3欄式入出庫（メイン機能） ===== */
+.io-3col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:1rem}
+.io-col{display:flex;flex-direction:column;align-items:center;padding:.85rem .5rem;gap:.4rem}
+.io-col:not(:last-child){border-right:1px solid var(--bd)}
+.io-col-label{font-size:.65rem;color:var(--muted);font-weight:600;letter-spacing:.05em}
+.io-col-icon{font-size:1.4rem}
+.io-col-val{font-size:1.5rem;font-weight:700}
+.io-col.in .io-col-val{color:var(--info)}
+.io-col.out .io-col-val{color:var(--warn)}
+.io-col.stock .io-col-val{color:var(--ok)}
+
+/* ===== 入出庫フォーム ===== */
+.type-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:.85rem}
+.tbtn{padding:.65rem;border-radius:8px;font-size:.82rem;font-weight:600;background:var(--bg3);border:2px solid transparent;color:var(--muted);transition:all .12s}
+.tbtn.on.in{background:#0c2e4a;border-color:var(--info);color:var(--info)}
+.tbtn.on.out{background:#2d2000;border-color:var(--warn);color:var(--warn)}
+.tbtn.on.discard{background:#2d0000;border-color:var(--danger);color:var(--danger)}
+
+.fg{display:flex;flex-direction:column;gap:.3rem;margin-bottom:.6rem}
+.fg label{font-size:.72rem;color:var(--muted)}
+.fg input,.fg select{background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:.55rem .75rem;color:var(--text);outline:none;width:100%}
+.fg input:focus,.fg select:focus{border-color:var(--ok)}
+.fg select option{background:var(--bg2)}
+
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.row3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:.6rem}
+
+/* ===== ビッグボタン ===== */
+.btn-rec{width:100%;padding:1rem;border-radius:10px;font-size:1rem;font-weight:700;background:var(--ok);color:#fff;border:none;margin-top:.5rem;transition:opacity .12s}
+.btn-rec:active{opacity:.8}
+.btn-rec.out{background:var(--warn)}
+.btn-rec.discard{background:var(--danger)}
+#io-msg{display:block;text-align:center;font-size:.8rem;min-height:1.1em;margin-top:.4rem}
+
+/* ===== 在庫一覧 ===== */
+.search-row{display:flex;gap:.6rem;margin-bottom:.75rem;align-items:center}
+.search-row input{flex:1;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:.5rem .75rem;color:var(--text);outline:none}
+.search-row input:focus{border-color:var(--ok)}
+.btn-add{background:var(--ok);color:#fff;border-radius:8px;padding:.5rem 1rem;font-size:.8rem;font-weight:600;flex-shrink:0}
+
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+th{text-align:left;padding:.45rem .6rem;color:var(--muted);font-weight:500;border-bottom:1px solid var(--bd);white-space:nowrap}
+td{padding:.5rem .6rem;border-bottom:1px solid var(--bd);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg3)}
+
+/* ===== バッジ ===== */
+.b{display:inline-block;padding:.12rem .45rem;border-radius:9999px;font-size:.65rem;font-weight:700}
+.b-ok{background:#064e2a;color:#4ade80}
+.b-warn{background:#451a03;color:#fcd34d}
+.b-danger{background:#450a0a;color:#fca5a5}
+.b-gray{background:var(--bg3);color:var(--muted)}
+.b-info{background:#0c2e4a;color:#7dd3fc}
+
+/* ===== モーダル ===== */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+.modal-bg.hide{display:none}
+.modal{background:var(--bg2);border-radius:14px 14px 0 0;width:100%;max-width:540px;max-height:88dvh;overflow-y:auto;padding:1.25rem;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))}
+.modal-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+.modal-title{font-size:.95rem;font-weight:700}
+.modal-close{background:none;border:none;color:var(--muted);font-size:1.3rem;line-height:1}
+
+/* ===== ダブルビンバッジ ===== */
+.dbin{display:inline-flex;align-items:center;gap:.3rem;background:#0c2e4a;border:1px solid var(--info);border-radius:6px;padding:.15rem .4rem;font-size:.65rem;color:var(--info)}
+
+/* ===== 棚卸しタブ ===== */
+.tanaoroshi-info{background:var(--bg3);border-left:3px solid var(--info);padding:.75rem;border-radius:0 8px 8px 0;font-size:.8rem;line-height:1.6;margin-bottom:1rem}
+.adj-row{display:flex;align-items:center;gap:.6rem;padding:.5rem 0;border-bottom:1px solid var(--bd)}
+.adj-name{flex:1;font-size:.82rem}
+.adj-sys{color:var(--muted);font-size:.78rem;min-width:60px;text-align:right}
+.adj-input{width:80px;background:var(--bg3);border:1px solid var(--bd);border-radius:7px;padding:.3rem .5rem;color:var(--text);text-align:right}
+.adj-diff{min-width:55px;text-align:right;font-size:.75rem;font-weight:700}
+
+/* ===== 履歴 ===== */
+.hist-filters{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem}
+.hist-filters select{background:var(--bg2);border:1px solid var(--bd);border-radius:7px;padding:.4rem .6rem;color:var(--text);font-size:.78rem}
+
+/* ===== レスポンシブ ===== */
+@media(max-width:480px){
+  #main{padding:.65rem}
+  .row3{grid-template-columns:1fr 1fr}
+  .water-grid{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ===== 仕入先サマリー ===== */
+.sup-block{border:1px solid var(--bd);border-radius:8px;margin-bottom:.6rem;overflow:hidden}
+.sup-header{display:flex;align-items:center;justify-content:space-between;padding:.55rem .75rem;background:var(--bg3);cursor:pointer;user-select:none}
+.sup-header-name{font-size:.82rem;font-weight:700}
+.sup-header-count{font-size:.72rem;color:var(--muted)}
+.sup-header-total{font-size:.82rem;color:var(--info);font-weight:700}
+.sup-rows{display:none}
+.sup-rows.open{display:block}
+.sup-row{display:flex;align-items:center;gap:.5rem;padding:.42rem .75rem;border-top:1px solid var(--bd);font-size:.78rem}
+.sup-row-name{flex:1}
+.sup-row-qty{font-weight:700;color:var(--ok);min-width:60px;text-align:right}
+.sup-row-unit{color:var(--muted);font-size:.7rem;min-width:30px}
+.sup-row-status{min-width:52px;text-align:right}
+</style>
+</head>
+<body>
+
+<!-- ===== PINログイン ===== -->
+<div id="login-screen">
+  <div class="pin-card">
+    <h1>🥘 エニクック<br>在庫管理</h1>
+    <p>4桁の暗証番号を入力</p>
+    <div class="pin-dots">
+      <div class="dot" id="d0"></div><div class="dot" id="d1"></div>
+      <div class="dot" id="d2"></div><div class="dot" id="d3"></div>
+    </div>
+    <div class="pin-grid">
+      <button class="pk" onclick="pk('1')">1</button>
+      <button class="pk" onclick="pk('2')">2</button>
+      <button class="pk" onclick="pk('3')">3</button>
+      <button class="pk" onclick="pk('4')">4</button>
+      <button class="pk" onclick="pk('5')">5</button>
+      <button class="pk" onclick="pk('6')">6</button>
+      <button class="pk" onclick="pk('7')">7</button>
+      <button class="pk" onclick="pk('8')">8</button>
+      <button class="pk" onclick="pk('9')">9</button>
+      <button class="pk c" onclick="pkc()">C</button>
+      <button class="pk" onclick="pk('0')">0</button>
+      <button class="pk d" onclick="pkd()">⌫</button>
+    </div>
+    <p id="pin-err"></p>
+  </div>
+</div>
+
+<!-- ===== アプリ本体 ===== -->
+<div id="app" style="display:none;flex-direction:column;min-height:100dvh">
+
+  <div id="hdr">
+    <div style="display:flex;align-items:center">
+      <span class="logo">エニクック <span>在庫管理</span></span>
+      <span id="abadge">!</span>
+    </div>
+    <button class="btn-logout" onclick="logout()">ログアウト</button>
+  </div>
+
+  <div id="tabs">
+    <button class="tab on" onclick="go('dashboard',this)">水位計</button>
+    <button class="tab"    onclick="go('io',this)">入出庫</button>
+    <button class="tab"    onclick="go('list',this)">在庫一覧</button>
+    <button class="tab"    onclick="go('tanaoroshi',this)">棚卸し</button>
+    <button class="tab"    onclick="go('history',this)">履歴</button>
+    <button class="tab"    onclick="go('master',this)">品目設定</button>
+    <button class="tab"    onclick="go('csv',this)">CSV入出力</button>
+  </div>
+
+  <div id="main">
+
+    <!-- ======= 水位計ダッシュボード ======= -->
+    <div id="page-dashboard" class="page on">
+
+      <!-- アラート -->
+      <div class="card" id="al-card">
+        <div class="ctitle">要対応アラート</div>
+        <div id="al-list"><div style="color:var(--muted);font-size:.8rem">読み込み中...</div></div>
+      </div>
+
+      <!-- 水位計グリッド：原材料 -->
+      <div class="ctitle" style="padding:.2rem 0 .5rem">原材料 — 水位</div>
+      <div class="water-grid" id="wg-materials"></div>
+
+      <!-- 水位計グリッド：包材 -->
+      <div class="ctitle" style="padding:.2rem 0 .5rem">包材 — 水位</div>
+      <div class="water-grid" id="wg-packaging"></div>
+
+      <!-- 水位計グリッド：製品 -->
+      <div class="ctitle" style="padding:.2rem 0 .5rem">製品 — 水位</div>
+      <div class="water-grid" id="wg-products"></div>
+
+      <!-- 直近10件 -->
+      <div class="card">
+        <div class="ctitle">直近の動き（10件）</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>日時</th><th>区分</th><th>品名</th><th>入庫数</th><th>出庫数</th><th>在庫数</th></tr></thead>
+            <tbody id="recent-tb"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= 入出庫（3欄式） ======= -->
+    <div id="page-io" class="page">
+
+      <!-- 区分選択 -->
+      <div class="type-btns">
+        <button class="tbtn on in" id="tb-in"      onclick="setType('in')">入庫</button>
+        <button class="tbtn out"   id="tb-out"     onclick="setType('out')">出庫</button>
+        <button class="tbtn discard" id="tb-discard" onclick="setType('discard')">廃棄</button>
+      </div>
+
+      <!-- 品目選択 -->
+      <div class="fg">
+        <label>カテゴリ</label>
+        <select id="io-cat" onchange="loadIoItems()">
+          <option value="materials">原材料</option>
+          <option value="packaging">包材</option>
+          <option value="products">製品</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>品名</label>
+        <select id="io-item" onchange="onItemSelect()">
+          <option value="">選択してください</option>
+        </select>
+      </div>
+
+      <!-- 3欄表示：前回の水位 -->
+      <div class="io-3col" id="io-3col">
+        <div class="io-col in">
+          <div class="io-col-icon">🚰</div>
+          <div class="io-col-label">入庫数</div>
+          <div class="io-col-val" id="col-in">—</div>
+        </div>
+        <div class="io-col out">
+          <div class="io-col-icon">🕳</div>
+          <div class="io-col-label">出庫数</div>
+          <div class="io-col-val" id="col-out">—</div>
+        </div>
+        <div class="io-col stock">
+          <div class="io-col-icon">💧</div>
+          <div class="io-col-label">現在在庫</div>
+          <div class="io-col-val" id="col-stock">—</div>
+        </div>
+      </div>
+
+      <!-- 数量入力 -->
+      <div class="row3">
+        <div class="fg">
+          <label id="qty-label">数量（入庫）</label>
+          <input type="number" id="io-qty" min="0.01" step="0.01" placeholder="0" inputmode="decimal">
+        </div>
+        <div class="fg">
+          <label>単位</label>
+          <input type="text" id="io-unit" readonly style="color:var(--muted)">
+        </div>
+        <div class="fg" id="lot-field">
+          <label>ロット番号</label>
+          <input type="text" id="io-lot" placeholder="自動採番">
+        </div>
+      </div>
+      <div class="fg" id="expiry-field">
+        <label>賞味期限（任意）</label>
+        <input type="date" id="io-expiry">
+      </div>
+      <div class="fg">
+        <label>備考（任意）</label>
+        <input type="text" id="io-note" placeholder="納品書No・使用先など">
+      </div>
+
+      <button class="btn-rec" id="rec-btn" onclick="submitIO()">入庫を記録する</button>
+      <span id="io-msg"></span>
+    </div>
+
+    <!-- ======= 在庫一覧 ======= -->
+    <div id="page-list" class="page">
+      <div class="search-row">
+        <input type="text" id="list-q" placeholder="品名で検索..." oninput="renderList()">
+        <select id="list-cat" onchange="renderList()" style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:.5rem .6rem;color:var(--text);font-size:.78rem">
+          <option value="">すべて</option>
+          <option value="materials">原材料</option>
+          <option value="packaging">包材</option>
+          <option value="products">製品</option>
+        </select>
+        <select id="list-supplier" onchange="renderList()" style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:.5rem .6rem;color:var(--text);font-size:.78rem">
+          <option value="">仕入先：すべて</option>
+        </select>
+        <button class="btn-add" onclick="openAdd()">＋ 追加</button>
+      </div>
+      <div class="card" style="padding:0">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>品名</th><th>カテゴリ</th><th>在庫</th><th>発注点</th><th>状態</th><th>管理</th><th></th></tr></thead>
+            <tbody id="list-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= 棚卸し ======= -->
+    <div id="page-tanaoroshi" class="page">
+      <div class="tanaoroshi-info">
+        📋 <strong>棚卸しの手順</strong><br>
+        ① 業務を止める　② 現物を数える　③ 下の「実数」欄に入力　④「差異を確定する」を押す<br>
+        <span style="color:var(--muted)">帳簿の数字は見ずに、現物だけを数えること。</span>
+      </div>
+      <div class="fg" style="margin-bottom:.85rem">
+        <label>カテゴリ</label>
+        <select id="tana-cat" onchange="renderTana()">
+          <option value="materials">原材料</option>
+          <option value="packaging">包材</option>
+          <option value="products">製品</option>
+        </select>
+      </div>
+      <div id="tana-list"></div>
+      <button class="btn-rec" style="margin-top:.5rem;background:var(--info)" onclick="commitTana()">差異を確定してリセットする</button>
+      <span id="tana-msg" style="display:block;text-align:center;font-size:.8rem;margin-top:.4rem"></span>
+    </div>
+
+    <!-- ======= 履歴 ======= -->
+    <div id="page-history" class="page">
+      <div class="hist-filters">
+        <select id="h-cat" onchange="loadHist()">
+          <option value="">すべて</option>
+          <option value="materials">原材料</option>
+          <option value="packaging">包材</option>
+          <option value="products">製品</option>
+        </select>
+        <select id="h-type" onchange="loadHist()">
+          <option value="">すべて</option>
+          <option value="in">入庫</option>
+          <option value="out">出庫</option>
+          <option value="discard">廃棄</option>
+          <option value="adjust">棚卸し調整</option>
+        </select>
+      </div>
+      <div class="card" style="padding:0">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>日時</th><th>区分</th><th>品名</th><th>入庫</th><th>出庫/廃棄</th><th>調整後在庫</th><th>ロット</th><th>備考</th></tr></thead>
+            <tbody id="hist-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= 品目設定（マスター） ======= -->
+    <div id="page-master" class="page">
+      <div class="search-row">
+        <input type="text" id="m-q" placeholder="品名で検索..." oninput="renderMaster()">
+        <select id="m-cat" onchange="renderMaster()" style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:.5rem .6rem;color:var(--text);font-size:.78rem">
+          <option value="">すべて</option>
+          <option value="materials">原材料</option>
+          <option value="packaging">包材</option>
+          <option value="products">製品</option>
+        </select>
+        <button class="btn-add" onclick="openAdd()">＋ 追加</button>
+      </div>
+      <div class="card" style="padding:0">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>品名</th><th>カテゴリ</th><th>単位</th><th>安全在庫</th><th>発注点</th><th>管理</th><th>仕入先</th><th></th></tr></thead>
+            <tbody id="master-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= CSV 入出力 ======= -->
+    <div id="page-csv" class="page">
+
+      <!-- エクスポート -->
+      <div class="card">
+        <div class="ctitle">📤 CSVエクスポート</div>
+        <div class="fg">
+          <label>対象カテゴリ</label>
+          <select id="csv-exp-cat">
+            <option value="materials">原材料</option>
+            <option value="packaging">包材</option>
+            <option value="products">製品</option>
+            <option value="all">すべて（3カテゴリ合算）</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>仕入先で絞込（任意）</label>
+          <select id="csv-exp-sup">
+            <option value="">すべての仕入先</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.25rem">
+          <button class="btn-rec" style="margin:0;flex:1;min-width:140px" onclick="exportMasterCSV()">在庫マスターをDL</button>
+          <button class="btn-rec" style="margin:0;flex:1;min-width:140px;background:var(--info)" onclick="exportHistCSV()">入出庫履歴をDL</button>
+        </div>
+        <div style="margin-top:.75rem;padding:.6rem .75rem;background:var(--bg3);border-radius:8px;font-size:.75rem;color:var(--muted);line-height:1.7">
+          在庫マスター CSV：品名 / カテゴリ / 単位 / 現在在庫 / 安全在庫 / 発注点 / 仕入先 / 管理方式 / ABCランク<br>
+          入出庫履歴 CSV：日時 / 区分 / 品名 / カテゴリ / 入庫数 / 出庫数 / 調整後在庫 / ロット / 備考
+        </div>
+      </div>
+
+      <!-- 仕入先別サマリー -->
+      <div class="card">
+        <div class="ctitle">🏭 仕入先別 在庫サマリー</div>
+        <div class="fg" style="margin-bottom:.75rem">
+          <label>カテゴリ</label>
+          <select id="csv-sup-cat" onchange="renderSupplierSummary()">
+            <option value="materials">原材料</option>
+            <option value="packaging">包材</option>
+            <option value="products">製品</option>
+            <option value="all">すべて</option>
+          </select>
+        </div>
+        <div id="supplier-summary"></div>
+        <button class="btn-rec" style="margin-top:.6rem;background:var(--bg3);color:var(--text);border:1px solid var(--bd)" onclick="exportSupplierCSV()">仕入先別サマリーをCSVでDL</button>
+      </div>
+
+      <!-- インポート -->
+      <div class="card">
+        <div class="ctitle">📥 CSVインポート（在庫マスター一括登録）</div>
+        <div style="padding:.6rem .75rem;background:var(--bg3);border-radius:8px;font-size:.75rem;color:var(--muted);line-height:1.7;margin-bottom:.75rem">
+          <strong style="color:var(--text)">CSVフォーマット（1行目はヘッダー）</strong><br>
+          品名,カテゴリ,単位,現在在庫,安全在庫,発注点,仕入先,管理方式,ABCランク<br>
+          カテゴリ：materials / packaging / products<br>
+          管理方式：3col / dbin　　ABCランク：A / B / C
+        </div>
+        <button class="btn-rec" style="margin:0 0 .6rem;background:var(--bg3);color:var(--text);border:1px solid var(--bd)" onclick="downloadTemplate()">テンプレートCSVをDL</button>
+        <div class="fg">
+          <label>CSVファイルを選択</label>
+          <input type="file" id="csv-file" accept=".csv" style="background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:.5rem;color:var(--text)">
+        </div>
+        <div id="csv-preview" style="display:none;margin:.5rem 0">
+          <div class="ctitle" style="margin-bottom:.5rem">プレビュー（先頭5件）</div>
+          <div class="tbl-wrap" id="csv-preview-wrap"></div>
+          <div id="csv-preview-count" style="font-size:.75rem;color:var(--muted);margin-top:.4rem"></div>
+        </div>
+        <button class="btn-rec" id="csv-import-btn" style="margin-top:.25rem;display:none" onclick="importCSV()">この内容でインポートする</button>
+        <span id="csv-msg" style="display:block;text-align:center;font-size:.8rem;margin-top:.4rem"></span>
+      </div>
+
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ===== 品目登録・編集モーダル ===== -->
+<div class="modal-bg hide" id="item-modal">
+  <div class="modal">
+    <div class="modal-hd">
+      <span class="modal-title" id="m-title">品目を登録</span>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <input type="hidden" id="m-id">
+    <input type="hidden" id="m-catv">
+    <div class="row2" style="gap:.6rem;margin-bottom:.6rem">
+      <div class="fg" style="margin:0">
+        <label>カテゴリ *</label>
+        <select id="m-cat-sel">
+          <option value="materials">原材料</option>
+          <option value="packaging">包材</option>
+          <option value="products">製品</option>
+        </select>
+      </div>
+      <div class="fg" style="margin:0">
+        <label>単位 *</label>
+        <input type="text" id="m-unit" placeholder="kg / 袋 / 枚">
+      </div>
+    </div>
+    <div class="fg">
+      <label>品名 *</label>
+      <input type="text" id="m-name" placeholder="例：有機トマトペースト">
+    </div>
+    <div class="row3" style="gap:.6rem;margin-bottom:.6rem">
+      <div class="fg" style="margin:0">
+        <label>現在在庫数</label>
+        <input type="number" id="m-qty" min="0" step="0.01" placeholder="0">
+      </div>
+      <div class="fg" style="margin:0">
+        <label>安全在庫</label>
+        <input type="number" id="m-safety" min="0" step="0.01" placeholder="0">
+      </div>
+      <div class="fg" style="margin:0">
+        <label>発注点</label>
+        <input type="number" id="m-reorder" min="0" step="0.01" placeholder="0">
+      </div>
+    </div>
+    <div class="row2" style="gap:.6rem;margin-bottom:.6rem">
+      <div class="fg" style="margin:0">
+        <label>管理方式</label>
+        <select id="m-mgmt">
+          <option value="3col">3欄式（入出庫記録）</option>
+          <option value="dbin">ダブルビン（包材など）</option>
+        </select>
+      </div>
+      <div class="fg" style="margin:0">
+        <label>ABCランク</label>
+        <select id="m-abc">
+          <option value="A">A（高単価・重要品）</option>
+          <option value="B">B（中間）</option>
+          <option value="C" selected>C（安価・副資材）</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg">
+      <label>仕入先（任意）</label>
+      <input type="text" id="m-supplier" placeholder="例：日本食研">
+    </div>
+    <div class="fg" id="m-expiry-row" style="display:none">
+      <label>賞味期限日数（製品のみ）</label>
+      <input type="number" id="m-edays" min="1" placeholder="例：730">
+    </div>
+    <div style="display:flex;gap:.6rem;margin-top:.75rem">
+      <button class="btn-rec" style="margin:0" onclick="saveItem()">保存する</button>
+      <button style="flex:0 0 auto;padding:.6rem 1rem;border-radius:8px;background:transparent;border:1px solid var(--bd);color:var(--text)" onclick="closeModal()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================================================
+//  Firebase
+// ===================================================
+firebase.initializeApp({
+  apiKey:            "AIzaSyDS72XQLIw2zGzYwrK49PID0uOxqTZigfM",
+  authDomain:        "inventory-a6bac.firebaseapp.com",
+  projectId:         "inventory-a6bac",
+  storageBucket:     "inventory-a6bac.firebasestorage.app",
+  messagingSenderId: "754262232768",
+  appId:             "1:754262232768:web:88a14bed0873616ae2e725"
+});
+var db = firebase.firestore();
+var FS = firebase.firestore.FieldValue;
+
+// ===================================================
+//  PIN認証
+// ===================================================
+var PIN = '8299', buf = '';
+function pk(d){
+  if(buf.length>=4) return;
+  buf+=d; updDots();
+  if(buf.length===4) setTimeout(checkPin,100);
+}
+function pkd(){ buf=buf.slice(0,-1); updDots(); }
+function pkc(){ buf=''; updDots(); document.getElementById('pin-err').textContent=''; }
+function updDots(){
+  for(var i=0;i<4;i++){
+    var el=document.getElementById('d'+i);
+    el.classList.toggle('on', i<buf.length);
+  }
+}
+function checkPin(){
+  if(buf===PIN){
+    sessionStorage.setItem('ac_ok','1');
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    startApp();
+  } else {
+    document.getElementById('pin-err').textContent='暗証番号が違います';
+    for(var i=0;i<4;i++) document.getElementById('d'+i).classList.add('shake');
+    setTimeout(function(){ buf=''; updDots(); for(var i=0;i<4;i++) document.getElementById('d'+i).classList.remove('shake'); },400);
+  }
+}
+function logout(){
+  sessionStorage.removeItem('ac_ok');
+  unsubs.forEach(function(u){u();}); unsubs=[];
+  items={materials:{},packaging:{},products:{}};
+  buf=''; updDots();
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('app').style.display='none';
+}
+window.addEventListener('DOMContentLoaded',function(){
+  if(sessionStorage.getItem('ac_ok')==='1'){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    startApp();
+  }
+});
+
+// ===================================================
+//  グローバル状態
+// ===================================================
+var items={materials:{},packaging:{},products:{}};
+var unsubs=[];
+var ioType='in';
+
+var CAT_LABEL={materials:'原材料',packaging:'包材',products:'製品'};
+var TYPE_LABEL={in:'入庫',out:'出庫',discard:'廃棄',adjust:'棚卸し調整'};
+
+// ===================================================
+//  アプリ起動
+// ===================================================
+function startApp(){
+  ['materials','packaging','products'].forEach(function(cat){
+    var u=db.collection(cat).onSnapshot(function(snap){
+      snap.forEach(function(d){ items[cat][d.id]=Object.assign({id:d.id},d.data()); });
+      snap.docChanges().forEach(function(c){ if(c.type==='removed') delete items[cat][c.doc.id]; });
+      renderWater(cat);
+      renderAlerts();
+      renderList();
+      renderMaster();
+      loadIoItems();
+      refreshSupplierSelects();
+    });
+    unsubs.push(u);
+  });
+  loadRecent();
+}
+
+// ===================================================
+//  タブ
+// ===================================================
+function go(name,el){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('on');});
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
+  document.getElementById('page-'+name).classList.add('on');
+  el.classList.add('on');
+  if(name==='history') loadHist();
+  if(name==='tanaoroshi') renderTana();
+  if(name==='io') loadIoItems();
+  if(name==='csv'){ renderSupplierSummary(); refreshSupplierSelects(); }
+}
+
+// ===================================================
+//  水位計ダッシュボード
+// ===================================================
+function renderWater(cat){
+  var el=document.getElementById('wg-'+cat);
+  if(!el) return;
+  var arr=Object.values(items[cat]);
+  arr.sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ja');});
+  if(!arr.length){ el.innerHTML='<div style="color:var(--muted);font-size:.78rem;padding:.5rem">未登録</div>'; return; }
+  el.innerHTML=arr.map(function(item){
+    var qty=item.currentQty||0;
+    var rp=item.reorderPoint||0;
+    var ss=item.safetyStock||0;
+    var max=Math.max(rp*3, qty*1.2, 10);
+    var pct=Math.min(100, max>0 ? (qty/max)*100 : 0);
+    var cls= qty<=rp&&rp>0 ? 'danger' : qty<=ss&&ss>0 ? 'warn' : 'ok';
+    var dbin= item.mgmt==='dbin' ? '<span class="dbin">ダブルビン</span>' : '';
+    return '<div class="wcard '+cls+'">'
+      +'<div class="wcard-name">'+esc(item.name||'')+'</div>'
+      +'<div class="wcard-qty">'+qty+'</div>'
+      +'<div class="wcard-unit">'+esc(item.unit||'')+' '+dbin+'</div>'
+      +'<div class="wbar-wrap"><div class="wbar" style="width:'+pct+'%"></div></div>'
+      +'</div>';
+  }).join('');
+}
+
+// ===================================================
+//  アラート
+// ===================================================
+function renderAlerts(){
+  var alerts=[];
+  var today=new Date(); today.setHours(0,0,0,0);
+  var in30=new Date(today); in30.setDate(in30.getDate()+30);
+  ['materials','packaging','products'].forEach(function(cat){
+    var lbl=CAT_LABEL[cat];
+    Object.values(items[cat]).forEach(function(item){
+      var qty=item.currentQty||0;
+      var rp=item.reorderPoint||0;
+      if(rp>0&&qty<=rp) alerts.push({type:'reorder',msg:lbl+'「'+item.name+'」が発注点以下（'+qty+' '+item.unit+'）'});
+      if(item.expiryDate){
+        var exp=new Date(item.expiryDate);
+        if(exp<today) alerts.push({type:'expiry',msg:lbl+'「'+item.name+'」の賞味期限切れ（'+item.expiryDate+'）'});
+        else if(exp<=in30) alerts.push({type:'expiry',msg:lbl+'「'+item.name+'」賞味期限30日以内（'+item.expiryDate+'）'});
+      }
+    });
+  });
+  var badge=document.getElementById('abadge');
+  badge.style.display=alerts.length?'inline':'none';
+  badge.textContent=alerts.length;
+  var el=document.getElementById('al-list');
+  if(!alerts.length){ el.innerHTML='<div style="color:var(--ok);font-size:.82rem">✅ アラートなし</div>'; return; }
+  el.innerHTML=alerts.map(function(a){
+    return '<div class="al '+a.type+'"><span class="al icon">'+(a.type==='reorder'?'🔴':'⚠️')+'</span>'+esc(a.msg)+'</div>';
+  }).join('');
+}
+
+// ===================================================
+//  直近履歴（ダッシュボード）
+// ===================================================
+function loadRecent(){
+  db.collection('transactions').orderBy('timestamp','desc').limit(10).get().then(function(snap){
+    var rows='';
+    snap.forEach(function(d){
+      var tx=d.data();
+      var ts=tx.timestamp?new Date(tx.timestamp.seconds*1000):new Date();
+      var tl=tx.type==='in'?'<span class="b b-info">入庫</span>':tx.type==='out'?'<span class="b b-warn">出庫</span>':tx.type==='adjust'?'<span class="b b-gray">調整</span>':'<span class="b b-danger">廃棄</span>';
+      var inQ= tx.type==='in' ? tx.qty : (tx.type==='adjust'&&tx.qty>0?tx.qty:'');
+      var outQ= tx.type==='out'||tx.type==='discard' ? tx.qty : (tx.type==='adjust'&&tx.qty<0?Math.abs(tx.qty):'');
+      rows+='<tr><td style="white-space:nowrap;font-size:.72rem">'+fmtDt(ts)+'</td><td>'+tl+'</td>'
+        +'<td>'+esc(tx.itemName||'')+'</td>'
+        +'<td style="color:var(--info)">'+(inQ!==''?inQ+' '+(tx.unit||''):'')+'</td>'
+        +'<td style="color:var(--warn)">'+(outQ!==''?outQ+' '+(tx.unit||''):'')+'</td>'
+        +'<td style="color:var(--ok);font-weight:700">'+(tx.afterQty!==undefined?tx.afterQty+' '+(tx.unit||''):'')+'</td>'
+        +'</tr>';
+    });
+    document.getElementById('recent-tb').innerHTML=rows||'<tr><td colspan="6" style="color:var(--muted);text-align:center">記録なし</td></tr>';
+  });
+}
+
+// ===================================================
+//  入出庫フォーム
+// ===================================================
+function setType(t){
+  ioType=t;
+  ['in','out','discard'].forEach(function(x){
+    document.getElementById('tb-'+x).classList.toggle('on',x===t);
+    document.getElementById('tb-'+x).classList.toggle(x,true);
+  });
+  document.getElementById('qty-label').textContent='数量（'+(t==='in'?'入庫':t==='out'?'出庫':'廃棄')+'）';
+  document.getElementById('rec-btn').textContent=(t==='in'?'入庫':'出庫')+'を記録する';
+  document.getElementById('rec-btn').className='btn-rec'+(t==='out'?' out':t==='discard'?' discard':'');
+  document.getElementById('lot-field').style.display=t==='in'?'flex':'none';
+  document.getElementById('expiry-field').style.display=t==='in'?'block':'none';
+}
+
+function loadIoItems(){
+  var cat=document.getElementById('io-cat').value;
+  var sel=document.getElementById('io-item');
+  var cur=sel.value;
+  sel.innerHTML='<option value="">選択してください</option>';
+  document.getElementById('io-unit').value='';
+  col('in','-'); col('out','-'); col('stock','-');
+  var arr=Object.values(items[cat]);
+  arr.sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ja');});
+  arr.forEach(function(item){
+    var o=document.createElement('option');
+    o.value=item.id; o.textContent=item.name;
+    o.dataset.unit=item.unit||'';
+    if(item.id===cur) o.selected=true;
+    sel.appendChild(o);
+  });
+  if(cur) onItemSelect();
+}
+
+function onItemSelect(){
+  var cat=document.getElementById('io-cat').value;
+  var id=document.getElementById('io-item').value;
+  var opt=document.getElementById('io-item').options[document.getElementById('io-item').selectedIndex];
+  document.getElementById('io-unit').value=opt&&opt.dataset.unit||'';
+  if(!id){col('in','-');col('out','-');col('stock','-');return;}
+  var item=items[cat][id];
+  if(!item) return;
+  col('stock', item.currentQty!==undefined?item.currentQty:'—');
+  // 直近の入出庫数を取得
+  db.collection('transactions').where('itemId','==',id).orderBy('timestamp','desc').limit(5).get().then(function(snap){
+    var lastIn='—', lastOut='—';
+    snap.forEach(function(d){
+      var tx=d.data();
+      if(lastIn==='—'&&tx.type==='in') lastIn=tx.qty;
+      if(lastOut==='—'&&(tx.type==='out'||tx.type==='discard')) lastOut=tx.qty;
+    });
+    col('in',lastIn); col('out',lastOut);
+  });
+}
+
+function col(id,val){ document.getElementById('col-'+id).textContent=val; }
+
+function submitIO(){
+  var cat=document.getElementById('io-cat').value;
+  var id=document.getElementById('io-item').value;
+  var qty=parseFloat(document.getElementById('io-qty').value);
+  var note=document.getElementById('io-note').value.trim();
+  var msg=document.getElementById('io-msg');
+  if(!id){showMsg(msg,'品名を選択してください','var(--danger)');return;}
+  if(!qty||qty<=0){showMsg(msg,'数量を入力してください','var(--danger)');return;}
+
+  var item=items[cat][id];
+  var unit=item?item.unit:'';
+  var beforeQty=item?item.currentQty||0:0;
+  var afterQty=ioType==='in'?beforeQty+qty:beforeQty-qty;
+
+  var tx={
+    type:ioType, category:cat, itemId:id, itemName:item?item.name:'',
+    qty:qty, unit:unit, note:note, beforeQty:beforeQty, afterQty:afterQty,
+    timestamp:FS.serverTimestamp()
+  };
+  if(ioType==='in'){
+    tx.lotNo=document.getElementById('io-lot').value.trim()||('L'+Date.now());
+    var exp=document.getElementById('io-expiry').value;
+    if(exp) tx.expiryDate=exp;
+  }
+
+  var batch=db.batch();
+  batch.set(db.collection('transactions').doc(), tx);
+  var delta=ioType==='in'?qty:-qty;
+  batch.update(db.collection(cat).doc(id),{currentQty:FS.increment(delta),updatedAt:FS.serverTimestamp()});
+
+  batch.commit().then(function(){
+    showMsg(msg,'✅ 記録しました（在庫: '+afterQty+' '+unit+'）','var(--ok)');
+    document.getElementById('io-qty').value='';
+    document.getElementById('io-note').value='';
+    document.getElementById('io-lot').value='';
+    document.getElementById('io-expiry').value='';
+    col('stock',afterQty);
+    loadRecent();
+    setTimeout(function(){msg.textContent='';},4000);
+  }).catch(function(e){showMsg(msg,'❌ '+e.message,'var(--danger)');});
+}
+
+// ===================================================
+//  在庫一覧
+// ===================================================
+function renderList(){
+  var q=(document.getElementById('list-q').value||'').toLowerCase();
+  var cat=document.getElementById('list-cat').value;
+  var tbody=document.getElementById('list-tbody');
+  var arr=[];
+  var cats=cat?[cat]:['materials','packaging','products'];
+  cats.forEach(function(c){ arr=arr.concat(Object.values(items[c]).map(function(i){return Object.assign({_cat:c},i);})); });
+  if(q) arr=arr.filter(function(i){return (i.name||'').toLowerCase().indexOf(q)!==-1;});
+  arr.sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ja');});
+  if(!arr.length){tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:1.5rem">品目なし</td></tr>';return;}
+  tbody.innerHTML=arr.map(function(item){
+    var qty=item.currentQty||0, rp=item.reorderPoint||0, ss=item.safetyStock||0;
+    var sb=qty<=rp&&rp>0?'<span class="b b-danger">発注要</span>':qty<=ss&&ss>0?'<span class="b b-warn">警告</span>':'<span class="b b-ok">正常</span>';
+    var mgmtb=item.mgmt==='dbin'?'<span class="dbin">ダブルビン</span>':'<span class="b b-gray">3欄式</span>';
+    return '<tr><td><strong>'+esc(item.name||'')+'</strong></td>'
+      +'<td><span class="b b-gray">'+CAT_LABEL[item._cat]+'</span></td>'
+      +'<td><strong>'+qty+'</strong> <span style="color:var(--muted);font-size:.7rem">'+esc(item.unit||'')+'</span></td>'
+      +'<td style="color:var(--muted)">'+rp+'</td>'
+      +'<td>'+sb+'</td>'
+      +'<td>'+mgmtb+'</td>'
+      +'<td><button onclick="openEdit(\''+item._cat+'\',\''+item.id+'\')" style="background:transparent;border:1px solid var(--bd);border-radius:6px;padding:.25rem .55rem;color:var(--muted);font-size:.72rem">編集</button></td>'
+      +'</tr>';
+  }).join('');
+}
+
+// ===================================================
+//  棚卸し
+// ===================================================
+function renderTana(){
+  var cat=document.getElementById('tana-cat').value;
+  var arr=Object.values(items[cat]);
+  arr.sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ja');});
+  var el=document.getElementById('tana-list');
+  if(!arr.length){el.innerHTML='<div style="color:var(--muted);font-size:.8rem">品目なし</div>';return;}
+  el.innerHTML=arr.map(function(item){
+    return '<div class="adj-row">'
+      +'<span class="adj-name">'+esc(item.name||'')+'<br><span style="font-size:.68rem;color:var(--muted)">'+esc(item.unit||'')+'</span></span>'
+      +'<span class="adj-sys" title="帳簿在庫">帳簿: '+(item.currentQty||0)+'</span>'
+      +'<input class="adj-input" type="number" min="0" step="0.01" placeholder="実数" data-id="'+item.id+'" data-sys="'+(item.currentQty||0)+'" oninput="calcDiff(this)">'
+      +'<span class="adj-diff" id="diff-'+item.id+'">—</span>'
+      +'</div>';
+  }).join('');
+}
+
+function calcDiff(inp){
+  var sys=parseFloat(inp.dataset.sys)||0;
+  var actual=parseFloat(inp.value);
+  var el=document.getElementById('diff-'+inp.dataset.id);
+  if(isNaN(actual)){el.textContent='—';el.style.color='var(--muted)';return;}
+  var d=actual-sys;
+  el.textContent=(d>=0?'+':'')+d;
+  el.style.color=d===0?'var(--ok)':d>0?'var(--info)':'var(--danger)';
+}
+
+function commitTana(){
+  var cat=document.getElementById('tana-cat').value;
+  var inputs=document.querySelectorAll('.adj-input');
+  var msg=document.getElementById('tana-msg');
+  var batch=db.batch();
+  var count=0;
+  inputs.forEach(function(inp){
+    var actual=parseFloat(inp.value);
+    if(isNaN(actual)||actual<0) return;
+    var id=inp.dataset.id;
+    var sys=parseFloat(inp.dataset.sys)||0;
+    var diff=actual-sys;
+    var item=items[cat][id];
+    if(!item) return;
+    batch.update(db.collection(cat).doc(id),{currentQty:actual,updatedAt:FS.serverTimestamp()});
+    batch.set(db.collection('transactions').doc(),{
+      type:'adjust', category:cat, itemId:id, itemName:item.name,
+      qty:diff, unit:item.unit||'', beforeQty:sys, afterQty:actual,
+      note:'棚卸し調整', timestamp:FS.serverTimestamp()
+    });
+    count++;
+  });
+  if(!count){showMsg(msg,'実数を入力してください','var(--warn)');return;}
+  batch.commit().then(function(){
+    showMsg(msg,'✅ '+count+'品目の差異を確定しました','var(--ok)');
+    renderTana();
+    loadRecent();
+  }).catch(function(e){showMsg(msg,'❌ '+e.message,'var(--danger)');});
+}
+
+// ===================================================
+//  履歴
+// ===================================================
+function loadHist(){
+  var cat=document.getElementById('h-cat').value;
+  var type=document.getElementById('h-type').value;
+  var tbody=document.getElementById('hist-tbody');
+  tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:1rem">読み込み中...</td></tr>';
+  var q=db.collection('transactions').orderBy('timestamp','desc').limit(200);
+  if(cat) q=q.where('category','==',cat);
+  if(type) q=q.where('type','==',type);
+  q.get().then(function(snap){
+    if(snap.empty){tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:1rem">履歴なし</td></tr>';return;}
+    var rows='';
+    snap.forEach(function(d){
+      var tx=d.data();
+      var ts=tx.timestamp?new Date(tx.timestamp.seconds*1000):new Date();
+      var tl=tx.type==='in'?'<span class="b b-info">入庫</span>':tx.type==='out'?'<span class="b b-warn">出庫</span>':tx.type==='adjust'?'<span class="b b-gray">調整</span>':'<span class="b b-danger">廃棄</span>';
+      var inQ= tx.type==='in'||(tx.type==='adjust'&&tx.qty>0) ? Math.abs(tx.qty)+' '+(tx.unit||'') : '';
+      var outQ= tx.type==='out'||tx.type==='discard'||(tx.type==='adjust'&&tx.qty<0) ? Math.abs(tx.qty)+' '+(tx.unit||'') : '';
+      rows+='<tr><td style="white-space:nowrap;font-size:.7rem">'+fmtDt(ts)+'</td><td>'+tl+'</td>'
+        +'<td>'+esc(tx.itemName||'')+'</td>'
+        +'<td style="color:var(--info)">'+inQ+'</td>'
+        +'<td style="color:var(--warn)">'+outQ+'</td>'
+        +'<td style="color:var(--ok);font-weight:700">'+(tx.afterQty!==undefined?tx.afterQty+' '+(tx.unit||''):'')+'</td>'
+        +'<td style="font-size:.7rem;color:var(--muted)">'+esc(tx.lotNo||'')+'</td>'
+        +'<td style="font-size:.7rem;color:var(--muted)">'+esc(tx.note||'')+'</td>'
+        +'</tr>';
+    });
+    tbody.innerHTML=rows;
+  });
+}
+
+// ===================================================
+//  品目マスター
+// ===================================================
+function renderMaster(){
+  var q=(document.getElementById('m-q').value||'').toLowerCase();
+  var cat=document.getElementById('m-cat').value;
+  var tbody=document.getElementById('master-tbody');
+  var arr=[];
+  var cats=cat?[cat]:['materials','packaging','products'];
+  cats.forEach(function(c){ arr=arr.concat(Object.values(items[c]).map(function(i){return Object.assign({_cat:c},i);})); });
+  if(q) arr=arr.filter(function(i){return (i.name||'').toLowerCase().indexOf(q)!==-1;});
+  arr.sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ja');});
+  if(!arr.length){tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:1.5rem">品目なし</td></tr>';return;}
+  tbody.innerHTML=arr.map(function(item){
+    var mgmtb=item.mgmt==='dbin'?'<span class="dbin">ダブルビン</span>':'<span class="b b-gray">3欄式</span>';
+    return '<tr><td><strong>'+esc(item.name||'')+'</strong></td>'
+      +'<td><span class="b b-gray">'+CAT_LABEL[item._cat]+'</span></td>'
+      +'<td style="color:var(--muted)">'+esc(item.unit||'')+'</td>'
+      +'<td style="color:var(--muted)">'+(item.safetyStock||0)+'</td>'
+      +'<td style="color:var(--muted)">'+(item.reorderPoint||0)+'</td>'
+      +'<td>'+mgmtb+'</td>'
+      +'<td style="font-size:.72rem;color:var(--muted)">'+esc(item.supplier||'')+'</td>'
+      +'<td><button onclick="openEdit(\''+item._cat+'\',\''+item.id+'\')" style="background:transparent;border:1px solid var(--bd);border-radius:6px;padding:.25rem .55rem;color:var(--muted);font-size:.72rem">編集</button></td>'
+      +'</tr>';
+  }).join('');
+}
+
+// ===================================================
+//  品目モーダル
+// ===================================================
+function openAdd(){
+  document.getElementById('m-id').value='';
+  document.getElementById('m-title').textContent='品目を新規登録';
+  document.getElementById('m-name').value='';
+  document.getElementById('m-unit').value='';
+  document.getElementById('m-qty').value='0';
+  document.getElementById('m-safety').value='0';
+  document.getElementById('m-reorder').value='0';
+  document.getElementById('m-mgmt').value='3col';
+  document.getElementById('m-abc').value='C';
+  document.getElementById('m-supplier').value='';
+  document.getElementById('m-edays').value='';
+  document.getElementById('m-expiry-row').style.display='none';
+  document.getElementById('item-modal').classList.remove('hide');
+  document.getElementById('m-cat-sel').addEventListener('change',function(){ document.getElementById('m-expiry-row').style.display=this.value==='products'?'block':'none'; });
+}
+function openEdit(cat,id){
+  var item=items[cat][id]; if(!item) return;
+  document.getElementById('m-id').value=id;
+  document.getElementById('m-catv').value=cat;
+  document.getElementById('m-title').textContent='品目を編集';
+  document.getElementById('m-cat-sel').value=cat;
+  document.getElementById('m-name').value=item.name||'';
+  document.getElementById('m-unit').value=item.unit||'';
+  document.getElementById('m-qty').value=item.currentQty||0;
+  document.getElementById('m-safety').value=item.safetyStock||0;
+  document.getElementById('m-reorder').value=item.reorderPoint||0;
+  document.getElementById('m-mgmt').value=item.mgmt||'3col';
+  document.getElementById('m-abc').value=item.abcRank||'C';
+  document.getElementById('m-supplier').value=item.supplier||'';
+  document.getElementById('m-edays').value=item.expiryDays||'';
+  document.getElementById('m-expiry-row').style.display=cat==='products'?'block':'none';
+  document.getElementById('item-modal').classList.remove('hide');
+}
+function closeModal(){ document.getElementById('item-modal').classList.add('hide'); }
+function saveItem(){
+  var id=document.getElementById('m-id').value;
+  var cat=id?document.getElementById('m-catv').value:document.getElementById('m-cat-sel').value;
+  var name=document.getElementById('m-name').value.trim();
+  var unit=document.getElementById('m-unit').value.trim();
+  if(!name||!unit){alert('品名と単位は必須です');return;}
+  var data={
+    name:name, unit:unit,
+    currentQty:parseFloat(document.getElementById('m-qty').value)||0,
+    safetyStock:parseFloat(document.getElementById('m-safety').value)||0,
+    reorderPoint:parseFloat(document.getElementById('m-reorder').value)||0,
+    mgmt:document.getElementById('m-mgmt').value,
+    abcRank:document.getElementById('m-abc').value,
+    supplier:document.getElementById('m-supplier').value.trim(),
+    updatedAt:FS.serverTimestamp()
+  };
+  var ed=document.getElementById('m-edays').value;
+  if(ed) data.expiryDays=parseInt(ed);
+  if(!id) data.createdAt=FS.serverTimestamp();
+  var ref=id?db.collection(cat).doc(id):db.collection(cat).doc();
+  (id?ref.update(data):ref.set(data)).then(function(){closeModal();}).catch(function(e){alert('保存失敗: '+e.message);});
+}
+
+// ===================================================
+//  ユーティリティ
+// ===================================================
+function fmtDt(d){
+  return d.getFullYear()+'/'+(d.getMonth()+1+'').padStart(2,'0')+'/'+(d.getDate()+'').padStart(2,'0')+' '+(d.getHours()+'').padStart(2,'0')+':'+(d.getMinutes()+'').padStart(2,'0');
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showMsg(el,txt,color){ el.textContent=txt; el.style.color=color; }
+
+// ===================================================
+//  仕入先リスト更新（全セレクトを同期）
+// ===================================================
+function refreshSupplierSelects(){
+  var sups=new Set();
+  ['materials','packaging','products'].forEach(function(c){
+    Object.values(items[c]).forEach(function(i){ if(i.supplier&&i.supplier.trim()) sups.add(i.supplier.trim()); });
+  });
+  var supArr=Array.from(sups).sort(function(a,b){return a.localeCompare(b,'ja');});
+  ['list-supplier','csv-exp-sup'].forEach(function(sid){
+    var sel=document.getElementById(sid); if(!sel) return;
+    var cur=sel.value;
+    sel.innerHTML='<option value="">'+(sid==='list-supplier'?'仕入先：すべて':'すべての仕入先')+'</option>';
+    supArr.forEach(function(s){
+      var o=document.createElement('option');
+      o.value=s; o.textContent=s;
+      if(s===cur) o.selected=true;
+      sel.appendChild(o);
+    });
+  });
+}
+
+// ===================================================
+//  在庫一覧（仕入先フィルター対応版）
+// ===================================================
+function renderList(){
+  refreshSupplierSelects();
+  var q=(document.getElementById('list-q').value||'').toLowerCase();
+  var cat=document.getElementById('list-cat').value;
+  var sup=(document.getElementById('list-supplier').value||'');
+  var tbody=document.getElementById('list-tbody');
+  var arr=[];
+  var cats=cat?[cat]:['materials','packaging','products'];
+  cats.forEach(function(c){ arr=arr.concat(Object.values(items[c]).map(function(i){return Object.assign({_cat:c},i);})); });
+  if(q)   arr=arr.filter(function(i){return (i.name||'').toLowerCase().indexOf(q)!==-1;});
+  if(sup) arr=arr.filter(function(i){return (i.supplier||'')=== sup;});
+  arr.sort(function(a,b){
+    var sa=(a.supplier||'zzz'), sb=(b.supplier||'zzz');
+    if(sa!==sb) return sa.localeCompare(sb,'ja');
+    return (a.name||'').localeCompare(b.name||'','ja');
+  });
+  if(!arr.length){tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:1.5rem">品目なし</td></tr>';return;}
+  var rows='', lastSup='__NONE__';
+  arr.forEach(function(item){
+    var sup2=item.supplier||'（仕入先未設定）';
+    if(sup2!==lastSup){
+      rows+='<tr><td colspan="7" style="background:var(--bg3);padding:.35rem .6rem;font-size:.72rem;font-weight:700;color:var(--info)">🏭 '+esc(sup2)+'</td></tr>';
+      lastSup=sup2;
+    }
+    var qty=item.currentQty||0, rp=item.reorderPoint||0, ss=item.safetyStock||0;
+    var sb=qty<=rp&&rp>0?'<span class="b b-danger">発注要</span>':qty<=ss&&ss>0?'<span class="b b-warn">警告</span>':'<span class="b b-ok">正常</span>';
+    var mgmtb=item.mgmt==='dbin'?'<span class="dbin">ダブルビン</span>':'<span class="b b-gray">3欄式</span>';
+    rows+='<tr><td style="padding-left:1.2rem"><strong>'+esc(item.name||'')+'</strong></td>'
+      +'<td><span class="b b-gray">'+CAT_LABEL[item._cat]+'</span></td>'
+      +'<td><strong>'+qty+'</strong> <span style="color:var(--muted);font-size:.7rem">'+esc(item.unit||'')+'</span></td>'
+      +'<td style="color:var(--muted)">'+rp+'</td>'
+      +'<td>'+sb+'</td>'
+      +'<td>'+mgmtb+'</td>'
+      +'<td><button onclick="openEdit(\''+item._cat+'\',\''+item.id+'\')" style="background:transparent;border:1px solid var(--bd);border-radius:6px;padding:.25rem .55rem;color:var(--muted);font-size:.72rem">編集</button></td>'
+      +'</tr>';
+  });
+  tbody.innerHTML=rows;
+}
+
+// ===================================================
+//  仕入先別サマリー
+// ===================================================
+function renderSupplierSummary(){
+  refreshSupplierSelects();
+  var cat=document.getElementById('csv-sup-cat').value;
+  var cats=cat==='all'?['materials','packaging','products']:[cat];
+  var map={};
+  cats.forEach(function(c){
+    Object.values(items[c]).forEach(function(item){
+      var s=item.supplier&&item.supplier.trim()?item.supplier.trim():'（仕入先未設定）';
+      if(!map[s]) map[s]={items:[],totalItems:0};
+      map[s].items.push(Object.assign({_cat:c},item));
+      map[s].totalItems++;
+    });
+  });
+  var supArr=Object.keys(map).sort(function(a,b){return a.localeCompare(b,'ja');});
+  var el=document.getElementById('supplier-summary');
+  if(!supArr.length){el.innerHTML='<div style="color:var(--muted);font-size:.8rem">データなし</div>';return;}
+  el.innerHTML=supArr.map(function(s){
+    var group=map[s];
+    var alertCount=group.items.filter(function(i){return (i.currentQty||0)<=(i.reorderPoint||0)&&(i.reorderPoint||0)>0;}).length;
+    var alertBadge=alertCount>0?'<span class="b b-danger">発注要 '+alertCount+'品目</span>':'<span class="b b-ok">正常</span>';
+    var rows=group.items.map(function(item){
+      var qty=item.currentQty||0, rp=item.reorderPoint||0;
+      var sb=qty<=rp&&rp>0?'<span class="b b-danger">発注要</span>':qty<=(item.safetyStock||0)&&(item.safetyStock||0)>0?'<span class="b b-warn">警告</span>':'<span class="b b-ok">正常</span>';
+      return '<div class="sup-row">'
+        +'<span class="sup-row-name">'+esc(item.name||'')+'<span style="font-size:.68rem;color:var(--muted);margin-left:.4rem">'+CAT_LABEL[item._cat]+'</span></span>'
+        +'<span class="sup-row-qty">'+qty+'</span>'
+        +'<span class="sup-row-unit">'+esc(item.unit||'')+'</span>'
+        +'<span class="sup-row-status">'+sb+'</span>'
+        +'</div>';
+    }).join('');
+    var uid='sup-'+s.replace(/[^a-zA-Z0-9]/g,'_');
+    return '<div class="sup-block">'
+      +'<div class="sup-header" onclick="toggleSup(\''+uid+'\')">'
+        +'<span class="sup-header-name">🏭 '+esc(s)+'</span>'
+        +'<span class="sup-header-count">'+group.totalItems+'品目</span>'
+        +'<span>'+alertBadge+'</span>'
+      +'</div>'
+      +'<div class="sup-rows" id="'+uid+'">'+rows+'</div>'
+      +'</div>';
+  }).join('');
+}
+function toggleSup(id){
+  var el=document.getElementById(id); if(!el) return;
+  el.classList.toggle('open');
+}
+
+// ===================================================
+//  CSV エクスポート：在庫マスター
+// ===================================================
+function exportMasterCSV(){
+  var cat=document.getElementById('csv-exp-cat').value;
+  var sup=document.getElementById('csv-exp-sup').value;
+  var cats=cat==='all'?['materials','packaging','products']:[cat];
+  var rows=[['品名','カテゴリ','単位','現在在庫','安全在庫','発注点','仕入先','管理方式','ABCランク']];
+  cats.forEach(function(c){
+    var arr=Object.values(items[c]);
+    arr.sort(function(a,b){return (a.supplier||'').localeCompare(b.supplier||'','ja')||((a.name||'').localeCompare(b.name||'','ja'));});
+    arr.forEach(function(item){
+      if(sup&&(item.supplier||'')!==sup) return;
+      rows.push([
+        item.name||'', CAT_LABEL[c], item.unit||'',
+        item.currentQty||0, item.safetyStock||0, item.reorderPoint||0,
+        item.supplier||'', item.mgmt||'3col', item.abcRank||'C'
+      ]);
+    });
+  });
+  var label=cat==='all'?'全カテゴリ':CAT_LABEL[cat];
+  dlCSV(rows, 'エニクック在庫マスター_'+label+'_'+fmtDate(new Date())+'.csv');
+}
+
+// ===================================================
+//  CSV エクスポート：入出庫履歴
+// ===================================================
+function exportHistCSV(){
+  var cat=document.getElementById('csv-exp-cat').value;
+  var sup=document.getElementById('csv-exp-sup').value;
+  var cats=cat==='all'?['materials','packaging','products']:[cat];
+  var msg=document.getElementById('csv-msg');
+  showMsg(msg,'履歴を取得中...','var(--muted)');
+  var q=db.collection('transactions').orderBy('timestamp','desc').limit(2000);
+  if(cat!=='all') q=q.where('category','==',cat);
+  q.get().then(function(snap){
+    var rows=[['日時','区分','品名','カテゴリ','入庫数','出庫数','廃棄数','調整後在庫','ロット番号','備考','仕入先']];
+    snap.forEach(function(d){
+      var tx=d.data();
+      if(!cats.includes(tx.category)) return;
+      // 仕入先フィルター
+      var itemSup='';
+      if(items[tx.category]&&items[tx.category][tx.itemId]) itemSup=items[tx.category][tx.itemId].supplier||'';
+      if(sup&&itemSup!==sup) return;
+      var ts=tx.timestamp?new Date(tx.timestamp.seconds*1000):new Date();
+      var inQ=tx.type==='in'?tx.qty:'';
+      var outQ=tx.type==='out'?tx.qty:'';
+      var disQ=tx.type==='discard'?tx.qty:'';
+      rows.push([
+        fmtDt(ts), TYPE_LABEL[tx.type]||tx.type, tx.itemName||'',
+        CAT_LABEL[tx.category]||tx.category,
+        inQ, outQ, disQ,
+        tx.afterQty!==undefined?tx.afterQty:'',
+        tx.lotNo||'', tx.note||'', itemSup
+      ]);
+    });
+    var label=cat==='all'?'全カテゴリ':CAT_LABEL[cat];
+    dlCSV(rows,'エニクック入出庫履歴_'+label+'_'+fmtDate(new Date())+'.csv');
+    showMsg(msg,'✅ ダウンロードしました（'+(rows.length-1)+'件）','var(--ok)');
+    setTimeout(function(){msg.textContent='';},4000);
+  }).catch(function(e){showMsg(msg,'❌ '+e.message,'var(--danger)');});
+}
+
+// ===================================================
+//  CSV エクスポート：仕入先別サマリー
+// ===================================================
+function exportSupplierCSV(){
+  var cat=document.getElementById('csv-sup-cat').value;
+  var cats=cat==='all'?['materials','packaging','products']:[cat];
+  var rows=[['仕入先','品名','カテゴリ','単位','現在在庫','安全在庫','発注点','状態','管理方式','ABCランク']];
+  var map={};
+  cats.forEach(function(c){
+    Object.values(items[c]).forEach(function(item){
+      var s=item.supplier&&item.supplier.trim()?item.supplier.trim():'（仕入先未設定）';
+      if(!map[s]) map[s]=[];
+      map[s].push(Object.assign({_cat:c},item));
+    });
+  });
+  Object.keys(map).sort(function(a,b){return a.localeCompare(b,'ja');}).forEach(function(s){
+    map[s].sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ja');}).forEach(function(item){
+      var qty=item.currentQty||0, rp=item.reorderPoint||0, ss=item.safetyStock||0;
+      var status=qty<=rp&&rp>0?'発注要':qty<=ss&&ss>0?'警告':'正常';
+      rows.push([s, item.name||'', CAT_LABEL[item._cat], item.unit||'', qty, ss, rp, status, item.mgmt||'3col', item.abcRank||'C']);
+    });
+  });
+  dlCSV(rows,'エニクック仕入先別在庫_'+fmtDate(new Date())+'.csv');
+}
+
+// ===================================================
+//  CSVテンプレートDL
+// ===================================================
+function downloadTemplate(){
+  var rows=[
+    ['品名','カテゴリ','単位','現在在庫','安全在庫','発注点','仕入先','管理方式','ABCランク'],
+    ['有機トマトペースト','materials','kg','50','10','20','日本食研','3col','A'],
+    ['レトルトパウチ200ml','packaging','枚','500','100','200','東洋製罐','dbin','C'],
+    ['つくしちゃんカレー','products','個','30','5','10','','3col','A']
+  ];
+  dlCSV(rows,'エニクック在庫マスター_テンプレート.csv');
+}
+
+// ===================================================
+//  CSV インポート
+// ===================================================
+var csvParsedData=[];
+document.addEventListener('DOMContentLoaded',function(){
+  var fi=document.getElementById('csv-file');
+  if(!fi) return;
+  fi.addEventListener('change',function(e){
+    var file=e.target.files[0]; if(!file) return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var text=ev.target.result;
+      csvParsedData=parseCSV(text);
+      showCSVPreview(csvParsedData);
+    };
+    reader.readAsText(file,'UTF-8');
+  });
+});
+
+function parseCSV(text){
+  var lines=text.split(/\r?\n/).filter(function(l){return l.trim();});
+  return lines.map(function(line){
+    var result=[], cur='', inQ=false;
+    for(var i=0;i<line.length;i++){
+      var c=line[i];
+      if(c==='"'){inQ=!inQ;}
+      else if(c===','&&!inQ){result.push(cur.trim());cur='';}
+      else{cur+=c;}
+    }
+    result.push(cur.trim());
+    return result;
+  });
+}
+
+function showCSVPreview(rows){
+  if(rows.length<2){
+    document.getElementById('csv-preview').style.display='none';
+    document.getElementById('csv-import-btn').style.display='none';
+    return;
+  }
+  var header=rows[0];
+  var preview=rows.slice(1,6);
+  var tbl='<table><thead><tr>'+header.map(function(h){return '<th>'+esc(h)+'</th>';}).join('')+'</tr></thead><tbody>';
+  tbl+=preview.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+esc(c)+'</td>';}).join('')+'</tr>';}).join('');
+  tbl+='</tbody></table>';
+  document.getElementById('csv-preview-wrap').innerHTML=tbl;
+  document.getElementById('csv-preview-count').textContent='全 '+(rows.length-1)+' 件（ヘッダー除く）';
+  document.getElementById('csv-preview').style.display='block';
+  document.getElementById('csv-import-btn').style.display='block';
+}
+
+function importCSV(){
+  if(!csvParsedData||csvParsedData.length<2){return;}
+  var msg=document.getElementById('csv-msg');
+  var header=csvParsedData[0];
+  var colIdx={};
+  ['品名','カテゴリ','単位','現在在庫','安全在庫','発注点','仕入先','管理方式','ABCランク'].forEach(function(h){
+    var i=header.indexOf(h);
+    colIdx[h]=i;
+  });
+  if(colIdx['品名']<0||colIdx['カテゴリ']<0||colIdx['単位']<0){
+    showMsg(msg,'❌ ヘッダーが正しくありません（品名・カテゴリ・単位は必須）','var(--danger)');return;
+  }
+  var rows=csvParsedData.slice(1).filter(function(r){return r[colIdx['品名']]&&r[colIdx['品名']].trim();});
+  if(!rows.length){showMsg(msg,'インポートするデータがありません','var(--warn)');return;}
+
+  var catMap={'materials':'materials','packaging':'packaging','products':'products',
+              '原材料':'materials','包材':'packaging','製品':'products'};
+  var batch=db.batch();
+  var count=0, err=[];
+  rows.forEach(function(r,idx){
+    var name=(r[colIdx['品名']]||'').trim();
+    var catRaw=(r[colIdx['カテゴリ']]||'').trim();
+    var cat=catMap[catRaw];
+    var unit=(r[colIdx['単位']]||'').trim();
+    if(!cat){err.push((idx+2)+'行目: カテゴリ「'+catRaw+'」が無効');return;}
+    if(!unit){err.push((idx+2)+'行目: 単位が未入力');return;}
+    var data={
+      name:name, unit:unit,
+      currentQty:parseFloat(r[colIdx['現在在庫']])||0,
+      safetyStock:parseFloat(r[colIdx['安全在庫']])||0,
+      reorderPoint:parseFloat(r[colIdx['発注点']])||0,
+      supplier:(r[colIdx['仕入先']]||'').trim(),
+      mgmt:(r[colIdx['管理方式']]||'3col').trim()||'3col',
+      abcRank:(r[colIdx['ABCランク']]||'C').trim()||'C',
+      updatedAt:FS.serverTimestamp(), createdAt:FS.serverTimestamp()
+    };
+    batch.set(db.collection(cat).doc(), data);
+    count++;
+  });
+  if(err.length){showMsg(msg,'⚠️ '+err.join(' / '),'var(--warn)');return;}
+  batch.commit().then(function(){
+    showMsg(msg,'✅ '+count+'品目をインポートしました','var(--ok)');
+    csvParsedData=[];
+    document.getElementById('csv-file').value='';
+    document.getElementById('csv-preview').style.display='none';
+    document.getElementById('csv-import-btn').style.display='none';
+  }).catch(function(e){showMsg(msg,'❌ '+e.message,'var(--danger)');});
+}
+
+// ===================================================
+//  CSV ダウンロードヘルパー
+// ===================================================
+function dlCSV(rows, filename){
+  var bom='\uFEFF';
+  var csv=bom+rows.map(function(r){
+    return r.map(function(c){
+      var s=String(c===null||c===undefined?'':c);
+      if(s.indexOf(',')!==-1||s.indexOf('"')!==-1||s.indexOf('\n')!==-1){
+        return '"'+s.replace(/"/g,'""')+'"';
+      }
+      return s;
+    }).join(',');
+  }).join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+}
+function fmtDate(d){
+  return d.getFullYear()+(d.getMonth()+1+'').padStart(2,'0')+(d.getDate()+'').padStart(2,'0');
+}
+
+// PWA
+if('serviceWorker'in navigator) navigator.serviceWorker.register('./sw.js');
+</script>
+</body>
+</html>
