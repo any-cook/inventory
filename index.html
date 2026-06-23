@@ -371,7 +371,7 @@ tr:hover td{background:#f5f3ff}
       <div class="card" style="padding:0">
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>品名</th><th>カテゴリ</th><th>在庫</th><th>発注点</th><th>状態</th><th>管理</th><th></th></tr></thead>
+            <thead><tr><th>品名</th><th>内容量</th><th>カテゴリ</th><th>在庫</th><th>発注点</th><th>状態</th><th>管理</th><th></th></tr></thead>
             <tbody id="list-tbody"></tbody>
           </table>
         </div>
@@ -944,7 +944,7 @@ function renderList(){
   cats.forEach(function(c){ arr=arr.concat(Object.values(items[c]).map(function(i){return Object.assign({_cat:c},i);})); });
   if(q) arr=arr.filter(function(i){return (i.name||'').toLowerCase().indexOf(q)!==-1;});
   arr.sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ja');});
-  if(!arr.length){tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:1.5rem">品目なし</td></tr>';return;}
+  if(!arr.length){tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:1.5rem">品目なし</td></tr>';return;}
   tbody.innerHTML=arr.map(function(item){
     var qty=item.currentQty||0, rp=item.reorderPoint||0, ss=item.safetyStock||0;
     var sb=qty<=rp&&rp>0?'<span class="b b-danger">発注要</span>':qty<=ss&&ss>0?'<span class="b b-warn">警告</span>':'<span class="b b-ok">正常</span>';
@@ -1206,18 +1206,21 @@ function renderList(){
     if(sa!==sb) return sa.localeCompare(sb,'ja');
     return (a.name||'').localeCompare(b.name||'','ja');
   });
-  if(!arr.length){tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:1.5rem">品目なし</td></tr>';return;}
+  if(!arr.length){tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:1.5rem">品目なし</td></tr>';return;}
   var rows='', lastSup='__NONE__';
   arr.forEach(function(item){
     var sup2=item.supplier||'（仕入先未設定）';
     if(sup2!==lastSup){
-      rows+='<tr><td colspan="7" style="background:var(--bg3);padding:.35rem .6rem;font-size:.72rem;font-weight:700;color:var(--info)">🏭 '+esc(sup2)+'</td></tr>';
+      rows+='<tr><td colspan="8" style="background:var(--bg3);padding:.35rem .6rem;font-size:.72rem;font-weight:700;color:var(--info)">🏭 '+esc(sup2)+'</td></tr>';
       lastSup=sup2;
     }
     var qty=item.currentQty||0, rp=item.reorderPoint||0, ss=item.safetyStock||0;
     var sb=qty<=rp&&rp>0?'<span class="b b-danger">発注要</span>':qty<=ss&&ss>0?'<span class="b b-warn">警告</span>':'<span class="b b-ok">正常</span>';
     var mgmtb=item.mgmt==='dbin'?'<span class="dbin">ダブルビン</span>':'<span class="b b-gray">3欄式</span>';
+    var capDisp='';
+    if(item._cat==='packaging'&&item.capacity) capDisp='<span style="color:var(--info);font-weight:800">'+item.capacity+(item.capacityUnit||'')+'</span>';
     rows+='<tr><td style="padding-left:1.2rem"><strong>'+esc(item.name||'')+'</strong></td>'
+      +'<td>'+capDisp+'</td>'
       +'<td><span class="b b-gray">'+CAT_LABEL[item._cat]+'</span></td>'
       +'<td><strong>'+qty+'</strong> <span style="color:var(--muted);font-size:.7rem">'+esc(item.unit||'')+'</span></td>'
       +'<td style="color:var(--muted)">'+rp+'</td>'
