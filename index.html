@@ -437,7 +437,7 @@ tr:hover td{background:#f5f3ff}
       <div class="card" style="padding:0">
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>品名</th><th>カテゴリ</th><th>単位</th><th>安全在庫</th><th>発注点</th><th>管理</th><th>仕入先</th><th></th></tr></thead>
+            <thead><tr><th>品名</th><th>カテゴリ</th><th>単位</th><th>内容量</th><th>安全在庫</th><th>発注点</th><th>管理</th><th>仕入先</th><th></th></tr></thead>
             <tbody id="master-tbody"></tbody>
           </table>
         </div>
@@ -470,7 +470,7 @@ tr:hover td{background:#f5f3ff}
           <button class="btn-rec" style="margin:0;flex:1;min-width:140px;background:var(--info)" onclick="exportHistCSV()">入出庫履歴をDL</button>
         </div>
         <div style="margin-top:.75rem;padding:.6rem .75rem;background:var(--bg3);border-radius:8px;font-size:.75rem;color:var(--muted);line-height:1.7">
-          在庫マスター CSV：品名 / カテゴリ / 単位 / 現在在庫 / 安全在庫 / 発注点 / 仕入先 / 管理方式 / ABCランク<br>
+          在庫マスター CSV：品名 / カテゴリ / 単位 / 内容量 / 内容量単位 / 現在在庫 / 安全在庫 / 発注点 / 仕入先 / 管理方式 / ABCランク<br>
           入出庫履歴 CSV：日時 / 区分 / 品名 / カテゴリ / 入庫数 / 出庫数 / 調整後在庫 / ロット / 備考
         </div>
       </div>
@@ -589,6 +589,16 @@ tr:hover td{background:#f5f3ff}
     <div class="fg">
       <label>仕入先（任意）</label>
       <input type="text" id="m-supplier" placeholder="例：日本食研">
+    </div>
+    <div class="fg" id="m-capacity-row" style="display:none">
+      <label>内容量（包材のみ）</label>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <input type="number" id="m-capacity" min="0" step="0.1" placeholder="例：200" style="flex:1">
+        <input type="text" id="m-capacity-unit" placeholder="ml / g / L" style="width:90px">
+      </div>
+      <div style="font-size:.75rem;color:var(--muted);margin-top:.3rem;line-height:1.6;background:var(--bg3);border-radius:8px;padding:.5rem .7rem">
+        パウチ・袋・ボトルなど容器の充填容量を入力。例：200ml、1kg、500g
+      </div>
     </div>
     <div class="fg" id="m-expiry-row" style="display:none">
       <label>賞味期限日数（製品のみ）</label>
@@ -1016,12 +1026,15 @@ function renderMaster(){
   cats.forEach(function(c){ arr=arr.concat(Object.values(items[c]).map(function(i){return Object.assign({_cat:c},i);})); });
   if(q) arr=arr.filter(function(i){return (i.name||'').toLowerCase().indexOf(q)!==-1;});
   arr.sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ja');});
-  if(!arr.length){tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:1.5rem">品目なし</td></tr>';return;}
+  if(!arr.length){tbody.innerHTML='<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:1.5rem">品目なし</td></tr>';return;}
   tbody.innerHTML=arr.map(function(item){
     var mgmtb=item.mgmt==='dbin'?'<span class="dbin">ダブルビン</span>':'<span class="b b-gray">3欄式</span>';
+    var capStr='';
+    if(item._cat==='packaging'&&item.capacity) capStr='<span style="color:var(--info);font-weight:700">'+item.capacity+(item.capacityUnit||'')+'</span>';
     return '<tr><td><strong>'+esc(item.name||'')+'</strong></td>'
       +'<td><span class="b b-gray">'+CAT_LABEL[item._cat]+'</span></td>'
       +'<td style="color:var(--muted)">'+esc(item.unit||'')+'</td>'
+      +'<td>'+capStr+'</td>'
       +'<td style="color:var(--muted)">'+(item.safetyStock||0)+'</td>'
       +'<td style="color:var(--muted)">'+(item.reorderPoint||0)+'</td>'
       +'<td>'+mgmtb+'</td>'
@@ -1045,10 +1058,16 @@ function openAdd(){
   document.getElementById('m-mgmt').value='3col';
   document.getElementById('m-abc').value='C';
   document.getElementById('m-supplier').value='';
+  document.getElementById('m-capacity').value='';
+  document.getElementById('m-capacity-unit').value='';
+  document.getElementById('m-capacity-row').style.display='none';
   document.getElementById('m-edays').value='';
   document.getElementById('m-expiry-row').style.display='none';
   document.getElementById('item-modal').classList.remove('hide');
-  document.getElementById('m-cat-sel').addEventListener('change',function(){ document.getElementById('m-expiry-row').style.display=this.value==='products'?'block':'none'; });
+  document.getElementById('m-cat-sel').addEventListener('change',function(){
+    document.getElementById('m-expiry-row').style.display=this.value==='products'?'block':'none';
+    document.getElementById('m-capacity-row').style.display=this.value==='packaging'?'block':'none';
+  });
 }
 function openEdit(cat,id){
   var item=items[cat][id]; if(!item) return;
@@ -1064,6 +1083,9 @@ function openEdit(cat,id){
   document.getElementById('m-mgmt').value=item.mgmt||'3col';
   document.getElementById('m-abc').value=item.abcRank||'C';
   document.getElementById('m-supplier').value=item.supplier||'';
+  document.getElementById('m-capacity').value=item.capacity||'';
+  document.getElementById('m-capacity-unit').value=item.capacityUnit||'';
+  document.getElementById('m-capacity-row').style.display=cat==='packaging'?'block':'none';
   document.getElementById('m-edays').value=item.expiryDays||'';
   document.getElementById('m-expiry-row').style.display=cat==='products'?'block':'none';
   document.getElementById('item-modal').classList.remove('hide');
@@ -1087,6 +1109,9 @@ function saveItem(){
   };
   var ed=document.getElementById('m-edays').value;
   if(ed) data.expiryDays=parseInt(ed);
+  var cap=document.getElementById('m-capacity').value;
+  var capUnit=document.getElementById('m-capacity-unit').value.trim();
+  if(cat==='packaging'&&cap) { data.capacity=parseFloat(cap); data.capacityUnit=capUnit||''; }
   if(!id) data.createdAt=FS.serverTimestamp();
   var ref=id?db.collection(cat).doc(id):db.collection(cat).doc();
   (id?ref.update(data):ref.set(data)).then(function(){closeModal();}).catch(function(e){alert('保存失敗: '+e.message);});
@@ -1221,7 +1246,7 @@ function exportMasterCSV(){
   var cat=document.getElementById('csv-exp-cat').value;
   var sup=document.getElementById('csv-exp-sup').value;
   var cats=cat==='all'?['materials','packaging','products']:[cat];
-  var rows=[['品名','カテゴリ','単位','現在在庫','安全在庫','発注点','仕入先','管理方式','ABCランク']];
+  var rows=[['品名','カテゴリ','単位','内容量','内容量単位','現在在庫','安全在庫','発注点','仕入先','管理方式','ABCランク']];
   cats.forEach(function(c){
     var arr=Object.values(items[c]);
     arr.sort(function(a,b){return (a.supplier||'').localeCompare(b.supplier||'','ja')||((a.name||'').localeCompare(b.name||'','ja'));});
@@ -1229,6 +1254,8 @@ function exportMasterCSV(){
       if(sup&&(item.supplier||'')!==sup) return;
       rows.push([
         item.name||'', CAT_LABEL[c], item.unit||'',
+        c==='packaging'&&item.capacity?item.capacity:'',
+        c==='packaging'&&item.capacityUnit?item.capacityUnit:'',
         item.currentQty||0, item.safetyStock||0, item.reorderPoint||0,
         item.supplier||'', item.mgmt||'3col', item.abcRank||'C'
       ]);
