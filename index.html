@@ -229,14 +229,11 @@ tr:hover td{background:#f5f3ff}
       <span class="logo">エニクック <span>在庫管理</span></span>
       <span id="abadge">!</span>
     </div>
-    <div style="display:flex;gap:.5rem;align-items:center">
-      <button onclick="pushToGitHub()" style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:.4rem .85rem;font-size:.78rem;font-weight:800;cursor:pointer" title="GitHubへ自動アップロード">⬆ GitHub</button>
-      <button class="btn-logout" onclick="logout()">ログアウト</button>
-    </div>
+    <button class="btn-logout" onclick="logout()">ログアウト</button>
   </div>
 
   <div id="tabs">
-    <button class="tab on" onclick="go('dashboard',this)">水位計</button>
+    <button class="tab on" onclick="go('dashboard',this)">在庫状況</button>
     <button class="tab"    onclick="go('io',this)">入出庫</button>
     <button class="tab"    onclick="go('list',this)">在庫一覧</button>
     <button class="tab"    onclick="go('tanaoroshi',this)">棚卸し</button>
@@ -257,15 +254,15 @@ tr:hover td{background:#f5f3ff}
       </div>
 
       <!-- 水位計グリッド：原材料 -->
-      <div class="ctitle" style="padding:.2rem 0 .5rem">原材料 — 水位</div>
+      <div class="ctitle" style="padding:.2rem 0 .5rem">原材料 — 在庫残量</div>
       <div class="water-grid" id="wg-materials"></div>
 
       <!-- 水位計グリッド：包材 -->
-      <div class="ctitle" style="padding:.2rem 0 .5rem">包材 — 水位</div>
+      <div class="ctitle" style="padding:.2rem 0 .5rem">包材 — 在庫残量</div>
       <div class="water-grid" id="wg-packaging"></div>
 
       <!-- 水位計グリッド：製品 -->
-      <div class="ctitle" style="padding:.2rem 0 .5rem">製品 — 水位</div>
+      <div class="ctitle" style="padding:.2rem 0 .5rem">製品 — 在庫残量</div>
       <div class="water-grid" id="wg-products"></div>
 
       <!-- 直近10件 -->
