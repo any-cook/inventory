@@ -1024,14 +1024,17 @@ function loadHist(){
   var type=document.getElementById('h-type').value;
   var tbody=document.getElementById('hist-tbody');
   tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:1rem">読み込み中...</td></tr>';
-  var q=db.collection('transactions').orderBy('timestamp','desc').limit(200);
-  if(cat) q=q.where('category','==',cat);
-  if(type) q=q.where('type','==',type);
-  q.get().then(function(snap){
-    if(snap.empty){tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:1rem">履歴なし</td></tr>';return;}
+  // Firestoreの複合インデックス不要のため、orderByのみでLimitを多めに取得し、JS側でフィルタリング
+  db.collection('transactions').orderBy('timestamp','desc').limit(500).get().then(function(snap){
+    var txs=[];
+    snap.forEach(function(d){ txs.push(d.data()); });
+    // JS側でフィルタリング
+    if(cat) txs=txs.filter(function(tx){return tx.category===cat;});
+    if(type) txs=txs.filter(function(tx){return tx.type===type;});
+    txs=txs.slice(0,200);
+    if(!txs.length){tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:1rem">履歴なし</td></tr>';return;}
     var rows='';
-    snap.forEach(function(d){
-      var tx=d.data();
+    txs.forEach(function(tx){
       var ts=tx.timestamp?new Date(tx.timestamp.seconds*1000):new Date();
       var tl=tx.type==='in'?'<span class="b b-info">入庫</span>':tx.type==='out'?'<span class="b b-warn">出庫</span>':tx.type==='adjust'?'<span class="b b-gray">調整</span>':'<span class="b b-danger">廃棄</span>';
       var inQ= tx.type==='in'||(tx.type==='adjust'&&tx.qty>0) ? Math.abs(tx.qty)+' '+(tx.unit||'') : '';
@@ -1046,6 +1049,8 @@ function loadHist(){
         +'</tr>';
     });
     tbody.innerHTML=rows;
+  }).catch(function(e){
+    tbody.innerHTML='<tr><td colspan="8" style="color:var(--danger);text-align:center;padding:1rem">読み込みエラー: '+e.message+'</td></tr>';
   });
 }
 
