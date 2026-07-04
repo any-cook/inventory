@@ -1669,6 +1669,16 @@ function doGitHubPush(token,repo,path,branch,msgEl){
   if(!localStorage.getItem('gh_branch')) localStorage.setItem('gh_branch','main');
 })();
 
+// 古いキャッシュを自動クリア（v4未満を削除）
+(async function(){
+  if('caches' in window){
+    const keys = await caches.keys();
+    for(const k of keys){
+      if(k !== 'anycook-inventory-v4') await caches.delete(k);
+    }
+  }
+})();
+
 // PWA - Service Worker（強制更新）
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').then(function(reg) {
