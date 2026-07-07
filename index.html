@@ -612,6 +612,13 @@ tr:hover td{background:#f5f3ff}
         <option value="">未分類</option>
       </select>
     </div>
+    <div class="fg" id="m-pkgtype-row" style="display:none">
+      <label>包材種別</label>
+      <select id="m-pkgtype">
+        <option value="bag" selected>👜 袋</option>
+        <option value="box">📦 ダンボール</option>
+      </select>
+    </div>
     <div class="row3" style="gap:.6rem;margin-bottom:.6rem">
       <div class="fg" style="margin:0">
         <label>現在在庫数</label>
@@ -836,9 +843,18 @@ function renderDash(cat){
       groups[s].forEach(function(item){ html+=makeIrow(item); });
     });
   } else if(cat==='packaging'){
-    html+='<div class="dash-group-title"><span class="gtag gtag-pack">📦 包材</span>'
-      +'<span style="color:var(--muted);font-size:.72rem">'+arr.length+'品目</span></div>';
-    arr.forEach(function(item){ html+=makeIrow(item); });
+    var bags=arr.filter(function(i){ return !i.pkgType||i.pkgType==='bag'; });
+    var boxes=arr.filter(function(i){ return i.pkgType==='box'; });
+    if(bags.length){
+      html+='<div class="dash-group-title"><span class="gtag gtag-pack">👜 袋</span>'
+        +'<span style="color:var(--muted);font-size:.72rem">'+bags.length+'品目</span></div>';
+      bags.forEach(function(item){ html+=makeIrow(item); });
+    }
+    if(boxes.length){
+      html+='<div class="dash-group-title"><span class="gtag" style="background:#fce7f3;color:#9d174d">📦 ダンボール</span>'
+        +'<span style="color:var(--muted);font-size:.72rem">'+boxes.length+'品目</span></div>';
+      boxes.forEach(function(item){ html+=makeIrow(item); });
+    }
   } else {
     html+='<div class="dash-group-title"><span class="gtag gtag-product">🛍️ 製品</span>'
       +'<span style="color:var(--muted);font-size:.72rem">'+arr.length+'品目</span></div>';
@@ -1168,6 +1184,7 @@ function syncModalFields(){
   document.getElementById('m-expiry-row').style.display=v==='products'?'block':'none';
   document.getElementById('m-capacity-row').style.display=v==='packaging'?'block':'none';
   document.getElementById('m-storage-row').style.display=v==='materials'?'block':'none';
+  document.getElementById('m-pkgtype-row').style.display=v==='packaging'?'block':'none';
 }
 function openAdd(){
   document.getElementById('m-id').value='';
@@ -1184,6 +1201,7 @@ function openAdd(){
   document.getElementById('m-capacity-unit').value='';
   document.getElementById('m-edays').value='';
   document.getElementById('m-storage').value='ambient';
+  document.getElementById('m-pkgtype').value='bag';
   document.getElementById('m-cat-sel').value='materials';
   syncModalFields();
   document.getElementById('item-modal').classList.remove('hide');
@@ -1207,6 +1225,8 @@ function openEdit(cat,id){
   document.getElementById('m-capacity-row').style.display=cat==='packaging'?'block':'none';
   document.getElementById('m-storage').value=item.storage||'ambient';
   document.getElementById('m-storage-row').style.display=cat==='materials'?'block':'none';
+  document.getElementById('m-pkgtype').value=item.pkgType||'bag';
+  document.getElementById('m-pkgtype-row').style.display=cat==='packaging'?'block':'none';
   document.getElementById('m-edays').value=item.expiryDays||'';
   document.getElementById('m-expiry-row').style.display=cat==='products'?'block':'none';
   document.getElementById('item-modal').classList.remove('hide');
@@ -1234,6 +1254,7 @@ function saveItem(){
   var capUnit=document.getElementById('m-capacity-unit').value.trim();
   if(cat==='packaging'&&cap) { data.capacity=parseFloat(cap); data.capacityUnit=capUnit||''; }
   if(cat==='materials') data.storage=document.getElementById('m-storage').value||'ambient';
+  if(cat==='packaging') data.pkgType=document.getElementById('m-pkgtype').value||'bag';
   if(!id) data.createdAt=FS.serverTimestamp();
   var ref=id?db.collection(cat).doc(id):db.collection(cat).doc();
   (id?ref.update(data):ref.set(data)).then(function(){closeModal();}).catch(function(e){alert('保存失敗: '+e.message);});
@@ -1307,6 +1328,10 @@ function renderList(){
       var st=item.storage||'ambient';
       var stMap={'frozen':'<span class="b" style="background:#dbeafe;color:#1e40af">❄️冷凍</span>','cold':'<span class="b" style="background:#e0f2fe;color:#0369a1">🌡️冷蔵</span>','ambient':'<span class="b" style="background:#fef9c3;color:#854d0e">🌿常温</span>'};
       storageTag=stMap[st]||'';
+    }
+    if(item._cat==='packaging'){
+      var pt=item.pkgType||'bag';
+      storageTag=pt==='box'?'<span class="b" style="background:#fce7f3;color:#9d174d">📦ダンボール</span>':'<span class="b" style="background:#f3e8ff;color:#7e22ce">👜袋</span>';
     }
     rows+='<tr><td style="padding-left:1.2rem"><strong>'+esc(item.name||'')+'</strong> '+storageTag+'</td>'
       +'<td>'+capDisp+'</td>'
