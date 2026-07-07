@@ -1,12 +1,11 @@
 // キャッシュバージョンを上げると古いキャッシュが自動削除される
-const CACHE_NAME = 'anycook-inventory-v4';
+const CACHE_NAME = 'anycook-inventory-v5';
 
 self.addEventListener('install', function(e) {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', function(e) {
-  // v3以外のキャッシュを全削除
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
@@ -23,18 +22,16 @@ self.addEventListener('activate', function(e) {
 });
 
 self.addEventListener('fetch', function(e) {
-  // Firebase・外部CDNはキャッシュしない
   var url = e.request.url;
   if (url.indexOf('firestore.googleapis.com') !== -1 ||
       url.indexOf('firebase') !== -1 ||
-      url.indexOf('gstatic.com') !== -1) {
+      url.indexOf('gstatic.com') !== -1 ||
+      url.indexOf('fonts.googleapis.com') !== -1) {
     return;
   }
-
   // ネットワーク優先（失敗時だけキャッシュ）
   e.respondWith(
     fetch(e.request).then(function(response) {
-      // 成功したらキャッシュに保存
       if (response && response.status === 200) {
         var clone = response.clone();
         caches.open(CACHE_NAME).then(function(cache) {
@@ -43,7 +40,6 @@ self.addEventListener('fetch', function(e) {
       }
       return response;
     }).catch(function() {
-      // オフライン時だけキャッシュを使う
       return caches.match(e.request);
     })
   );
