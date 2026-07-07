@@ -1699,7 +1699,7 @@ function doGitHubPush(token,repo,path,branch,msgEl){
   if('caches' in window){
     const keys = await caches.keys();
     for(const k of keys){
-      if(k !== 'anycook-inventory-v4') await caches.delete(k);
+      if(k !== 'anycook-inventory-v5') await caches.delete(k);
     }
   }
 })();
