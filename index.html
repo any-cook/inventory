@@ -437,7 +437,7 @@ tr:hover td{background:#f5f3ff}
       <div class="card" style="padding:0">
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>日時</th><th>区分</th><th>品名</th><th>入庫</th><th>出庫/廃棄</th><th>調整後在庫</th><th>ロット</th><th>備考</th></tr></thead>
+            <thead><tr><th>日時</th><th>区分</th><th>品名</th><th>入庫</th><th>出庫/廃棄</th><th>調整後在庫</th><th>ロット</th><th>備考</th><th></th></tr></thead>
             <tbody id="hist-tbody"></tbody>
           </table>
         </div>
@@ -573,6 +573,39 @@ tr:hover td{background:#f5f3ff}
       <button style="flex:0 0 auto;padding:.6rem 1rem;border-radius:8px;background:transparent;border:1px solid var(--bd);color:var(--text)" onclick="document.getElementById('gh-modal').classList.add('hide')">キャンセル</button>
     </div>
     <div id="gh-msg" style="margin-top:.5rem;font-size:.82rem;font-weight:700;text-align:center;min-height:1.4em"></div>
+  </div>
+</div>
+
+<!-- ===== 履歴編集モーダル ===== -->
+<div class="modal-bg hide" id="hist-edit-modal">
+  <div class="modal" style="max-width:420px;border-radius:20px;margin:auto">
+    <div class="modal-hd">
+      <span class="modal-title">✏️ 履歴を編集</span>
+      <button class="modal-close" onclick="document.getElementById('hist-edit-modal').classList.add('hide')">&times;</button>
+    </div>
+    <input type="hidden" id="he-idx">
+    <input type="hidden" id="he-id">
+    <div style="background:var(--bg3);border-radius:10px;padding:.65rem .85rem;margin-bottom:.9rem;font-size:.88rem">
+      <strong id="he-item" style="color:var(--text)"></strong>
+      <span id="he-type" style="color:var(--muted);margin-left:.5rem;font-size:.8rem"></span>
+    </div>
+    <div class="fg">
+      <label>数量 <span id="he-unit" style="color:var(--muted);font-weight:500"></span></label>
+      <input type="number" id="he-qty" min="0" step="0.01">
+    </div>
+    <div class="fg">
+      <label>ロットNo</label>
+      <input type="text" id="he-lot" placeholder="ロット番号">
+    </div>
+    <div class="fg">
+      <label>備考</label>
+      <input type="text" id="he-note" placeholder="メモ・備考">
+    </div>
+    <div style="display:flex;gap:.6rem;margin-top:.5rem">
+      <button class="btn-rec" style="margin:0" onclick="saveHistEdit()">保存</button>
+      <button style="flex:0 0 auto;padding:.6rem 1rem;border-radius:8px;background:transparent;border:2px solid var(--bd);color:var(--text);font-weight:700;cursor:pointer" onclick="document.getElementById('hist-edit-modal').classList.add('hide')">キャンセル</button>
+    </div>
+    <div id="he-msg" style="margin-top:.5rem;font-size:.85rem;font-weight:700;text-align:center;min-height:1.2em"></div>
   </div>
 </div>
 
@@ -1111,22 +1144,24 @@ function commitTana(){
 // ===================================================
 //  履歴
 // ===================================================
+// 履歴データをグローバルに保持（編集・削除用）
+var _histData = [];
+
 function loadHist(){
   var cat=document.getElementById('h-cat').value;
   var type=document.getElementById('h-type').value;
   var tbody=document.getElementById('hist-tbody');
-  tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:1rem">読み込み中...</td></tr>';
-  // Firestoreの複合インデックス不要のため、orderByのみでLimitを多めに取得し、JS側でフィルタリング
+  tbody.innerHTML='<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:1rem">読み込み中...</td></tr>';
   db.collection('transactions').orderBy('timestamp','desc').limit(500).get().then(function(snap){
     var txs=[];
-    snap.forEach(function(d){ txs.push(d.data()); });
-    // JS側でフィルタリング
+    snap.forEach(function(d){ txs.push(Object.assign({_id:d.id}, d.data())); });
     if(cat) txs=txs.filter(function(tx){return tx.category===cat;});
     if(type) txs=txs.filter(function(tx){return tx.type===type;});
     txs=txs.slice(0,200);
-    if(!txs.length){tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:1rem">履歴なし</td></tr>';return;}
+    _histData=txs;
+    if(!txs.length){tbody.innerHTML='<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:1rem">履歴なし</td></tr>';return;}
     var rows='';
-    txs.forEach(function(tx){
+    txs.forEach(function(tx,idx){
       var ts=tx.timestamp?new Date(tx.timestamp.seconds*1000):new Date();
       var tl=tx.type==='in'?'<span class="b b-info">入庫</span>':tx.type==='out'?'<span class="b b-warn">出庫</span>':tx.type==='adjust'?'<span class="b b-gray">調整</span>':'<span class="b b-danger">廃棄</span>';
       var inQ= tx.type==='in'||(tx.type==='adjust'&&tx.qty>0) ? Math.abs(tx.qty)+' '+(tx.unit||'') : '';
@@ -1138,11 +1173,100 @@ function loadHist(){
         +'<td style="color:var(--ok);font-weight:700">'+(tx.afterQty!==undefined?tx.afterQty+' '+(tx.unit||''):'')+'</td>'
         +'<td style="font-size:.7rem;color:var(--muted)">'+esc(tx.lotNo||'')+'</td>'
         +'<td style="font-size:.7rem;color:var(--muted)">'+esc(tx.note||'')+'</td>'
+        +'<td style="white-space:nowrap">'
+          +'<button onclick="openHistEdit('+idx+')" style="background:var(--bg3);border:1.5px solid var(--bd);border-radius:7px;padding:.25rem .5rem;font-size:.72rem;font-weight:700;cursor:pointer;margin-right:.2rem">✏️</button>'
+          +'<button onclick="deleteHist('+idx+')" style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:7px;padding:.25rem .5rem;font-size:.72rem;font-weight:700;cursor:pointer;color:#991b1b">🗑️</button>'
+        +'</td>'
         +'</tr>';
     });
     tbody.innerHTML=rows;
   }).catch(function(e){
-    tbody.innerHTML='<tr><td colspan="8" style="color:var(--danger);text-align:center;padding:1rem">読み込みエラー: '+e.message+'</td></tr>';
+    tbody.innerHTML='<tr><td colspan="9" style="color:var(--danger);text-align:center;padding:1rem">読み込みエラー: '+e.message+'</td></tr>';
+  });
+}
+
+// 履歴編集モーダルを開く
+function openHistEdit(idx){
+  var tx=_histData[idx];
+  if(!tx) return;
+  document.getElementById('he-idx').value=idx;
+  document.getElementById('he-id').value=tx._id;
+  document.getElementById('he-item').textContent=tx.itemName||'';
+  document.getElementById('he-type').textContent=tx.type==='in'?'入庫':tx.type==='out'?'出庫':tx.type==='discard'?'廃棄':'調整';
+  document.getElementById('he-qty').value=Math.abs(tx.qty)||0;
+  document.getElementById('he-lot').value=tx.lotNo||'';
+  document.getElementById('he-note').value=tx.note||'';
+  document.getElementById('he-unit').textContent=tx.unit||'';
+  document.getElementById('hist-edit-modal').classList.remove('hide');
+}
+
+// 履歴を保存
+function saveHistEdit(){
+  var idx=parseInt(document.getElementById('he-idx').value);
+  var docId=document.getElementById('he-id').value;
+  var tx=_histData[idx];
+  var newQty=parseFloat(document.getElementById('he-qty').value)||0;
+  var lot=document.getElementById('he-lot').value.trim();
+  var note=document.getElementById('he-note').value.trim();
+  var msgEl=document.getElementById('he-msg');
+  msgEl.textContent='保存中...'; msgEl.style.color='var(--muted)';
+
+  // 在庫の差分補正
+  var oldQty=Math.abs(tx.qty)||0;
+  var diff=newQty-oldQty;
+  var isOut=tx.type==='out'||tx.type==='discard';
+  var stockDiff=isOut?-diff:diff;
+
+  var batch=db.batch();
+  // 履歴ドキュメントを更新
+  batch.update(db.collection('transactions').doc(docId),{
+    qty: isOut?-newQty:newQty,
+    afterQty: (tx.afterQty||0)+stockDiff,
+    lotNo: lot,
+    note: note
+  });
+  // 品目の現在在庫を補正
+  if(tx.itemId && tx.category && stockDiff!==0){
+    var col=tx.category==='materials'?'materials':tx.category==='packaging'?'packaging':'products';
+    batch.update(db.collection(col).doc(tx.itemId),{
+      currentQty: firebase.firestore.FieldValue.increment(stockDiff)
+    });
+  }
+  batch.commit().then(function(){
+    msgEl.textContent='✅ 保存しました'; msgEl.style.color='var(--ok)';
+    setTimeout(function(){
+      document.getElementById('hist-edit-modal').classList.add('hide');
+      loadHist();
+    },800);
+  }).catch(function(e){
+    msgEl.textContent='❌ '+e.message; msgEl.style.color='var(--danger)';
+  });
+}
+
+// 履歴を削除
+function deleteHist(idx){
+  var tx=_histData[idx];
+  if(!tx) return;
+  if(!confirm('「'+tx.itemName+'」の'+
+    (tx.type==='in'?'入庫':tx.type==='out'?'出庫':tx.type==='discard'?'廃棄':'調整')+
+    '記録を削除しますか？
+在庫数も元に戻ります。')) return;
+
+  var isOut=tx.type==='out'||tx.type==='discard';
+  var stockDiff=isOut?Math.abs(tx.qty):-Math.abs(tx.qty); // 削除→逆方向に補正
+
+  var batch=db.batch();
+  batch.delete(db.collection('transactions').doc(tx._id));
+  if(tx.itemId && tx.category){
+    var col=tx.category==='materials'?'materials':tx.category==='packaging'?'packaging':'products';
+    batch.update(db.collection(col).doc(tx.itemId),{
+      currentQty: firebase.firestore.FieldValue.increment(stockDiff)
+    });
+  }
+  batch.commit().then(function(){
+    loadHist();
+  }).catch(function(e){
+    alert('削除エラー: '+e.message);
   });
 }
 
