@@ -1247,10 +1247,7 @@ function saveHistEdit(){
 function deleteHist(idx){
   var tx=_histData[idx];
   if(!tx) return;
-  if(!confirm('「'+tx.itemName+'」の'+
-    (tx.type==='in'?'入庫':tx.type==='out'?'出庫':tx.type==='discard'?'廃棄':'調整')+
-    '記録を削除しますか？
-在庫数も元に戻ります。')) return;
+  if(!confirm('「'+tx.itemName+'」の'+(tx.type==='in'?'入庫':tx.type==='out'?'出庫':tx.type==='discard'?'廃棄':'調整')+'記録を削除しますか？\n在庫数も元に戻ります。')) return;
 
   var isOut=tx.type==='out'||tx.type==='discard';
   var stockDiff=isOut?Math.abs(tx.qty):-Math.abs(tx.qty); // 削除→逆方向に補正
