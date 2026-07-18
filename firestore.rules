@@ -19,8 +19,7 @@ service cloud.firestore {
       match /lots/{lotId} { allow read, write: if true; }
     }
     match /transactions/{id} {
-      allow read, create: if true;
-      allow update, delete: if false;
+      allow read, write: if true;
     }
   }
 }
