@@ -1227,8 +1227,8 @@ function saveHistEdit(){
   });
   // 品目の現在在庫を補正
   if(tx.itemId && tx.category && stockDiff!==0){
-    var col=tx.category==='materials'?'materials':tx.category==='packaging'?'packaging':'products';
-    batch.update(db.collection(col).doc(tx.itemId),{
+    var colName=tx.category==='materials'?'materials':tx.category==='packaging'?'packaging':'products';
+    batch.update(db.collection(colName).doc(tx.itemId),{
       currentQty: firebase.firestore.FieldValue.increment(stockDiff)
     });
   }
@@ -1255,8 +1255,8 @@ function deleteHist(idx){
   var batch=db.batch();
   batch.delete(db.collection('transactions').doc(tx._id));
   if(tx.itemId && tx.category){
-    var col=tx.category==='materials'?'materials':tx.category==='packaging'?'packaging':'products';
-    batch.update(db.collection(col).doc(tx.itemId),{
+    var colName=tx.category==='materials'?'materials':tx.category==='packaging'?'packaging':'products';
+    batch.update(db.collection(colName).doc(tx.itemId),{
       currentQty: firebase.firestore.FieldValue.increment(stockDiff)
     });
   }
