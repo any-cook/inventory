@@ -1077,7 +1077,10 @@ function renderList(){
       +'<td style="color:var(--muted)">'+rp+'</td>'
       +'<td>'+sb+'</td>'
       +'<td>'+mgmtb+'</td>'
-      +'<td><button onclick="openEdit(\''+item._cat+'\',\''+item.id+'\')" style="background:transparent;border:1px solid var(--bd);border-radius:6px;padding:.25rem .55rem;color:var(--muted);font-size:.72rem">編集</button></td>'
+      +'<td style="white-space:nowrap">'
+        +'<button onclick="openEdit(\''+item._cat+'\',\''+item.id+'\')" style="background:var(--bg3);border:1.5px solid var(--bd);border-radius:7px;padding:.25rem .5rem;font-size:.72rem;font-weight:700;cursor:pointer;margin-right:.2rem">✏️</button>'
+        +'<button onclick="deleteItem(\''+item._cat+'\',\''+item.id+'\',\''+esc(item.name||'')+'\')" style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:7px;padding:.25rem .5rem;font-size:.72rem;font-weight:700;cursor:pointer;color:#991b1b">🗑️</button>'
+        +'</td>'
       +'</tr>';
   }).join('');
 }
@@ -1292,7 +1295,10 @@ function renderMaster(){
       +'<td style="color:var(--muted)">'+(item.reorderPoint||0)+'</td>'
       +'<td>'+mgmtb+'</td>'
       +'<td style="font-size:.72rem;color:var(--muted)">'+esc(item.supplier||'')+'</td>'
-      +'<td><button onclick="openEdit(\''+item._cat+'\',\''+item.id+'\')" style="background:transparent;border:1px solid var(--bd);border-radius:6px;padding:.25rem .55rem;color:var(--muted);font-size:.72rem">編集</button></td>'
+      +'<td style="white-space:nowrap">'
+        +'<button onclick="openEdit(\''+item._cat+'\',\''+item.id+'\')" style="background:var(--bg3);border:1.5px solid var(--bd);border-radius:7px;padding:.25rem .5rem;font-size:.72rem;font-weight:700;cursor:pointer;margin-right:.2rem">✏️</button>'
+        +'<button onclick="deleteItem(\''+item._cat+'\',\''+item.id+'\',\''+esc(item.name||'')+'\')" style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:7px;padding:.25rem .5rem;font-size:.72rem;font-weight:700;cursor:pointer;color:#991b1b">🗑️</button>'
+        +'</td>'
       +'</tr>';
   }).join('');
 }
@@ -1327,6 +1333,18 @@ function openAdd(){
   syncModalFields();
   document.getElementById('item-modal').classList.remove('hide');
 }
+function deleteItem(cat,id,name){
+  if(!confirm('「'+name+'」を削除しますか？\n※入出庫履歴は残ります。在庫数のみ削除されます。')) return;
+  db.collection(cat).doc(id).delete().then(function(){
+    delete items[cat][id];
+    renderList();
+    renderDash(cat);
+    alert('削除しました');
+  }).catch(function(e){
+    alert('削除エラー: '+e.message);
+  });
+}
+
 function openEdit(cat,id){
   var item=items[cat][id]; if(!item) return;
   document.getElementById('m-id').value=id;
@@ -1461,7 +1479,10 @@ function renderList(){
       +'<td style="color:var(--muted)">'+rp+'</td>'
       +'<td>'+sb+'</td>'
       +'<td>'+mgmtb+'</td>'
-      +'<td><button onclick="openEdit(\''+item._cat+'\',\''+item.id+'\')" style="background:transparent;border:1px solid var(--bd);border-radius:6px;padding:.25rem .55rem;color:var(--muted);font-size:.72rem">編集</button></td>'
+      +'<td style="white-space:nowrap">'
+        +'<button onclick="openEdit(\''+item._cat+'\',\''+item.id+'\')" style="background:var(--bg3);border:1.5px solid var(--bd);border-radius:7px;padding:.25rem .5rem;font-size:.72rem;font-weight:700;cursor:pointer;margin-right:.2rem">✏️</button>'
+        +'<button onclick="deleteItem(\''+item._cat+'\',\''+item.id+'\',\''+esc(item.name||'')+'\')" style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:7px;padding:.25rem .5rem;font-size:.72rem;font-weight:700;cursor:pointer;color:#991b1b">🗑️</button>'
+        +'</td>'
       +'</tr>';
   });
   tbody.innerHTML=rows;
