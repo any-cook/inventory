@@ -382,14 +382,22 @@ tr:hover td{background:#f5f3ff}
             <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem" class="ck-icon">⬜</span>
           </label>
 
-          <label style="display:flex;align-items:flex-start;gap:.65rem;background:#fff;border:2px solid var(--bd);border-radius:12px;padding:.75rem .9rem;cursor:pointer;transition:border-color .12s" onclick="this.classList.toggle('checked');this.style.borderColor=this.classList.contains('checked')?'var(--ok)':'var(--bd)';this.style.background=this.classList.contains('checked')?'#f0fdf4':'#fff';updateCheckBtn()">
-            <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem">🌡️</span>
-            <div style="flex:1">
-              <div style="font-weight:800;font-size:.9rem;color:var(--text);margin-bottom:.25rem">② 品温（温度）</div>
-              <div style="font-size:.78rem;color:var(--muted);line-height:1.6">冷凍品：-15℃以下（理想：-18℃以下）<br>冷蔵品：10℃以下（肉・魚等は5℃以下）<br>常温品：30℃以下<br>非接触型温度計で表面温度を測定・夏場のトラック内高温化に注意</div>
+          <div style="background:#fff;border:2px solid var(--bd);border-radius:12px;padding:.75rem .9rem;transition:border-color .12s" id="ck-temp-card">
+            <div style="display:flex;align-items:flex-start;gap:.65rem;cursor:pointer" onclick="toggleTempCheck()">
+              <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem">🌡️</span>
+              <div style="flex:1">
+                <div style="font-weight:800;font-size:.9rem;color:var(--text);margin-bottom:.25rem">② 品温（温度）</div>
+                <div style="font-size:.78rem;color:var(--muted);line-height:1.6">冷凍品：-15℃以下（理想：-18℃以下）<br>冷蔵品：10℃以下（肉・魚等は5℃以下）<br>常温品：30℃以下</div>
+              </div>
+              <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem" id="ck-temp-icon">⬜</span>
             </div>
-            <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem" class="ck-icon">⬜</span>
-          </label>
+            <div style="margin-top:.6rem;display:flex;align-items:center;gap:.5rem">
+              <input type="number" id="ck-temp-val" step="0.1" placeholder="例：-18.5"
+                style="flex:1;background:var(--bg3);border:2px solid var(--bd);border-radius:8px;padding:.45rem .7rem;font-size:.95rem;font-weight:700;color:var(--text)"
+                oninput="if(this.value){document.getElementById('ck-temp-card').classList.add('checked');document.getElementById('ck-temp-card').style.borderColor='var(--ok)';document.getElementById('ck-temp-card').style.background='#f0fdf4';document.getElementById('ck-temp-icon').textContent='✅';updateCheckBtn();}else{document.getElementById('ck-temp-card').classList.remove('checked');document.getElementById('ck-temp-card').style.borderColor='var(--bd)';document.getElementById('ck-temp-card').style.background='#fff';document.getElementById('ck-temp-icon').textContent='⬜';updateCheckBtn();}">
+              <span style="font-size:.9rem;font-weight:700;color:var(--muted)">℃</span>
+            </div>
+          </div>
 
           <label style="display:flex;align-items:flex-start;gap:.65rem;background:#fff;border:2px solid var(--bd);border-radius:12px;padding:.75rem .9rem;cursor:pointer;transition:border-color .12s" onclick="this.classList.toggle('checked');this.style.borderColor=this.classList.contains('checked')?'var(--ok)':'var(--bd)';this.style.background=this.classList.contains('checked')?'#f0fdf4':'#fff';updateCheckBtn()">
             <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem">📦</span>
@@ -400,14 +408,24 @@ tr:hover td{background:#f5f3ff}
             <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem" class="ck-icon">⬜</span>
           </label>
 
-          <label style="display:flex;align-items:flex-start;gap:.65rem;background:#fff;border:2px solid var(--bd);border-radius:12px;padding:.75rem .9rem;cursor:pointer;transition:border-color .12s" onclick="this.classList.toggle('checked');this.style.borderColor=this.classList.contains('checked')?'var(--ok)':'var(--bd)';this.style.background=this.classList.contains('checked')?'#f0fdf4':'#fff';updateCheckBtn()">
-            <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem">🏷️</span>
-            <div style="flex:1">
-              <div style="font-weight:800;font-size:.9rem;color:var(--text);margin-bottom:.25rem">④ ロット番号・賞味期限</div>
-              <div style="font-size:.78rem;color:var(--muted);line-height:1.6">賞味期限・製造日が明瞭に印字・表示されていること<br>印字なし原料はコンテナ移し替え時に「入荷日」を明記<br>印字が擦れて読めないものはNG</div>
+          <div style="background:#fff;border:2px solid var(--bd);border-radius:12px;padding:.75rem .9rem;transition:border-color .12s" id="ck-lot-card">
+            <div style="display:flex;align-items:flex-start;gap:.65rem">
+              <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem">🏷️</span>
+              <div style="flex:1">
+                <div style="font-weight:800;font-size:.9rem;color:var(--text);margin-bottom:.25rem">④ ロット番号・賞味期限</div>
+                <div style="font-size:.78rem;color:var(--muted);line-height:1.6">賞味期限・製造日が明瞭に印字されていること<br>印字なし原料はコンテナ移し替え時に「入荷日」を明記</div>
+              </div>
+              <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem" id="ck-lot-icon">⬜</span>
             </div>
-            <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem" class="ck-icon">⬜</span>
-          </label>
+            <div style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem">
+              <input type="text" id="ck-lot-val" placeholder="ロット番号（例：L20260724-001）"
+                style="background:var(--bg3);border:2px solid var(--bd);border-radius:8px;padding:.45rem .7rem;font-size:.88rem;color:var(--text)"
+                oninput="updateLotCheck()">
+              <input type="text" id="ck-expiry-val" placeholder="賞味期限（例：2027/07/24）"
+                style="background:var(--bg3);border:2px solid var(--bd);border-radius:8px;padding:.45rem .7rem;font-size:.88rem;color:var(--text)"
+                oninput="updateLotCheck()">
+            </div>
+          </div>
 
         </div>
         <div id="check-warning" style="display:none;margin-top:.6rem;background:#fef2f2;border:2px solid #fecaca;border-radius:10px;padding:.6rem .85rem;font-size:.82rem;color:#991b1b;font-weight:700">
@@ -838,6 +856,7 @@ var TYPE_LABEL={in:'入庫',out:'出庫',discard:'廃棄',adjust:'棚卸し調�
 //  アプリ起動
 // ===================================================
 function startApp(){
+  setInspectionPlaceholders();
   ['materials','packaging','products'].forEach(function(cat){
     var u=db.collection(cat).onSnapshot(function(snap){
       snap.forEach(function(d){ items[cat][d.id]=Object.assign({id:d.id},d.data()); });
@@ -1025,16 +1044,69 @@ function setType(t){
       el.style.background='#fff';
       el.querySelector('.ck-icon').textContent='⬜';
     });
+    // 品温・ロットカードもリセット
+    ['ck-temp-card','ck-lot-card'].forEach(function(id){
+      var card=document.getElementById(id);
+      if(card){card.classList.remove('checked');card.style.borderColor='var(--bd)';card.style.background='#fff';}
+    });
+    document.getElementById('ck-temp-icon').textContent='⬜';
+    document.getElementById('ck-lot-icon').textContent='⬜';
+    document.getElementById('ck-temp-val').value='';
+    document.getElementById('ck-lot-val').value='';
+    document.getElementById('ck-expiry-val').value='';
     document.getElementById('check-warning').style.display='none';
+    setInspectionPlaceholders();
   }
 }
 
 function updateCheckBtn(){
-  // チェックされたらアイコンを更新
   document.querySelectorAll('#inspection-checklist label').forEach(function(el){
     el.querySelector('.ck-icon').textContent=el.classList.contains('checked')?'✅':'⬜';
   });
   document.getElementById('check-warning').style.display='none';
+}
+
+// 品温：タップでもトグル可能
+function toggleTempCheck(){
+  var card=document.getElementById('ck-temp-card');
+  var val=document.getElementById('ck-temp-val').value;
+  if(val) return; // 値があるときはタップ無効（入力値で制御）
+  var on=card.classList.toggle('checked');
+  card.style.borderColor=on?'var(--ok)':'var(--bd)';
+  card.style.background=on?'#f0fdf4':'#fff';
+  document.getElementById('ck-temp-icon').textContent=on?'✅':'⬜';
+  updateCheckBtn();
+}
+
+// ロット・賞味期限：どちらか入力でチェック
+function updateLotCheck(){
+  var lot=document.getElementById('ck-lot-val').value.trim();
+  var exp=document.getElementById('ck-expiry-val').value.trim();
+  var card=document.getElementById('ck-lot-card');
+  var on=lot||exp;
+  if(on){
+    card.classList.add('checked');
+    card.style.borderColor='var(--ok)';
+    card.style.background='#f0fdf4';
+    document.getElementById('ck-lot-icon').textContent='✅';
+  } else {
+    card.classList.remove('checked');
+    card.style.borderColor='var(--bd)';
+    card.style.background='#fff';
+    document.getElementById('ck-lot-icon').textContent='⬜';
+  }
+  document.getElementById('check-warning').style.display='none';
+}
+
+// 当日日時のプレースホルダーを設定
+function setInspectionPlaceholders(){
+  var now=new Date();
+  var ymd=now.getFullYear()+'/'+(now.getMonth()+1+'').padStart(2,'0')+'/'+(''+now.getDate()).padStart(2,'0');
+  var hm=(''+now.getHours()).padStart(2,'0')+':'+(''+now.getMinutes()).padStart(2,'0');
+  var lotEl=document.getElementById('ck-lot-val');
+  var expEl=document.getElementById('ck-expiry-val');
+  if(lotEl) lotEl.placeholder='ロット番号（記載例：L'+ymd.replace(/\//g,'')+'-001）';
+  if(expEl) expEl.placeholder='賞味期限（記載例：'+ymd+'）';
 }
 
 function loadIoItems(){
@@ -1093,10 +1165,26 @@ function submitIO(){
     document.querySelectorAll('#inspection-checklist label').forEach(function(el){
       if(!el.classList.contains('checked')) unchecked++;
     });
+    // 品温カード・ロットカードも確認
+    if(!document.getElementById('ck-temp-card').classList.contains('checked')) unchecked++;
+    if(!document.getElementById('ck-lot-card').classList.contains('checked')) unchecked++;
     if(unchecked>0){
       document.getElementById('check-warning').style.display='block';
       document.getElementById('check-warning').scrollIntoView({behavior:'smooth',block:'center'});
       return;
+    }
+    // 品温・ロット情報を備考に自動転記
+    var tempVal=document.getElementById('ck-temp-val').value;
+    var lotVal=document.getElementById('ck-lot-val').value.trim();
+    var expVal=document.getElementById('ck-expiry-val').value.trim();
+    var extra=[];
+    if(tempVal) extra.push('品温:'+tempVal+'℃');
+    if(lotVal)  extra.push('LOT:'+lotVal);
+    if(expVal)  extra.push('賞味期限:'+expVal);
+    if(extra.length){
+      var noteEl=document.getElementById('io-note');
+      var cur=noteEl.value.trim();
+      noteEl.value=(cur?cur+' / ':'')+extra.join(' / ');
     }
   }
 
@@ -1130,7 +1218,18 @@ function submitIO(){
       el.style.background='#fff';
       el.querySelector('.ck-icon').textContent='⬜';
     });
+    ['ck-temp-card','ck-lot-card'].forEach(function(id){
+      var card=document.getElementById(id);
+      if(card){card.classList.remove('checked');card.style.borderColor='var(--bd)';card.style.background='#fff';}
+    });
+    document.getElementById('ck-temp-icon').textContent='⬜';
+    document.getElementById('ck-lot-icon').textContent='⬜';
+    document.getElementById('ck-temp-val').value='';
+    document.getElementById('ck-lot-val').value='';
+    document.getElementById('ck-expiry-val').value='';
+    document.getElementById('io-note').value='';
     document.getElementById('check-warning').style.display='none';
+    setInspectionPlaceholders();
     document.getElementById('io-qty').value='';
     document.getElementById('io-note').value='';
     document.getElementById('io-lot').value='';
