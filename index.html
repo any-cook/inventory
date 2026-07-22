@@ -368,6 +368,53 @@ tr:hover td{background:#f5f3ff}
         <input type="text" id="io-note" placeholder="納品書No・使用先など">
       </div>
 
+      <!-- 検収チェックリスト（入庫時のみ表示） -->
+      <div id="inspection-checklist" style="display:none;margin-top:.9rem">
+        <div style="font-size:.82rem;font-weight:800;color:var(--accent);letter-spacing:.05em;margin-bottom:.6rem">📋 受入検収チェックリスト</div>
+        <div style="display:flex;flex-direction:column;gap:.5rem">
+
+          <label style="display:flex;align-items:flex-start;gap:.65rem;background:#fff;border:2px solid var(--bd);border-radius:12px;padding:.75rem .9rem;cursor:pointer;transition:border-color .12s" onclick="this.classList.toggle('checked');this.style.borderColor=this.classList.contains('checked')?'var(--ok)':'var(--bd)';this.style.background=this.classList.contains('checked')?'#f0fdf4':'#fff';updateCheckBtn()">
+            <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem">🔢</span>
+            <div style="flex:1">
+              <div style="font-weight:800;font-size:.9rem;color:var(--text);margin-bottom:.25rem">① 数量・重量</div>
+              <div style="font-size:.78rem;color:var(--muted);line-height:1.6">納品書と「数量」および「重量」が完全に一致していること<br>ケース数だけでなく総重量（kg）も合わせて確認・数が合わない場合は即時保留</div>
+            </div>
+            <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem" class="ck-icon">⬜</span>
+          </label>
+
+          <label style="display:flex;align-items:flex-start;gap:.65rem;background:#fff;border:2px solid var(--bd);border-radius:12px;padding:.75rem .9rem;cursor:pointer;transition:border-color .12s" onclick="this.classList.toggle('checked');this.style.borderColor=this.classList.contains('checked')?'var(--ok)':'var(--bd)';this.style.background=this.classList.contains('checked')?'#f0fdf4':'#fff';updateCheckBtn()">
+            <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem">🌡️</span>
+            <div style="flex:1">
+              <div style="font-weight:800;font-size:.9rem;color:var(--text);margin-bottom:.25rem">② 品温（温度）</div>
+              <div style="font-size:.78rem;color:var(--muted);line-height:1.6">冷凍品：-15℃以下（理想：-18℃以下）<br>冷蔵品：10℃以下（肉・魚等は5℃以下）<br>常温品：30℃以下<br>非接触型温度計で表面温度を測定・夏場のトラック内高温化に注意</div>
+            </div>
+            <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem" class="ck-icon">⬜</span>
+          </label>
+
+          <label style="display:flex;align-items:flex-start;gap:.65rem;background:#fff;border:2px solid var(--bd);border-radius:12px;padding:.75rem .9rem;cursor:pointer;transition:border-color .12s" onclick="this.classList.toggle('checked');this.style.borderColor=this.classList.contains('checked')?'var(--ok)':'var(--bd)';this.style.background=this.classList.contains('checked')?'#f0fdf4':'#fff';updateCheckBtn()">
+            <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem">📦</span>
+            <div style="flex:1">
+              <div style="font-weight:800;font-size:.9rem;color:var(--text);margin-bottom:.25rem">③ 外装・衛生</div>
+              <div style="font-size:.78rem;color:var(--muted);line-height:1.6">著しい変形・破れ・濡れ・汚れがないこと・テープの剥がれや開封痕がないこと<br>水濡れや霜つきは温度変化（一度溶けた）のサイン<br>段ボールの潰れ・破れは異物混入リスクとして判断</div>
+            </div>
+            <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem" class="ck-icon">⬜</span>
+          </label>
+
+          <label style="display:flex;align-items:flex-start;gap:.65rem;background:#fff;border:2px solid var(--bd);border-radius:12px;padding:.75rem .9rem;cursor:pointer;transition:border-color .12s" onclick="this.classList.toggle('checked');this.style.borderColor=this.classList.contains('checked')?'var(--ok)':'var(--bd)';this.style.background=this.classList.contains('checked')?'#f0fdf4':'#fff';updateCheckBtn()">
+            <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem">🏷️</span>
+            <div style="flex:1">
+              <div style="font-weight:800;font-size:.9rem;color:var(--text);margin-bottom:.25rem">④ ロット番号・賞味期限</div>
+              <div style="font-size:.78rem;color:var(--muted);line-height:1.6">賞味期限・製造日が明瞭に印字・表示されていること<br>印字なし原料はコンテナ移し替え時に「入荷日」を明記<br>印字が擦れて読めないものはNG</div>
+            </div>
+            <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem" class="ck-icon">⬜</span>
+          </label>
+
+        </div>
+        <div id="check-warning" style="display:none;margin-top:.6rem;background:#fef2f2;border:2px solid #fecaca;border-radius:10px;padding:.6rem .85rem;font-size:.82rem;color:#991b1b;font-weight:700">
+          ⚠️ 未チェックの項目があります。すべて確認してから記録してください。
+        </div>
+      </div>
+
       <button class="btn-rec" id="rec-btn" onclick="submitIO()">入庫を記録する</button>
       <span id="io-msg"></span>
     </div>
@@ -968,6 +1015,26 @@ function setType(t){
   document.getElementById('rec-btn').className='btn-rec'+(t==='out'?' out':t==='discard'?' discard':'');
   document.getElementById('lot-field').style.display=t==='in'?'flex':'none';
   document.getElementById('expiry-field').style.display=t==='in'?'block':'none';
+  // 検収チェックリストは入庫時のみ表示
+  document.getElementById('inspection-checklist').style.display=t==='in'?'block':'none';
+  // チェックをリセット
+  if(t==='in'){
+    document.querySelectorAll('#inspection-checklist label').forEach(function(el){
+      el.classList.remove('checked');
+      el.style.borderColor='var(--bd)';
+      el.style.background='#fff';
+      el.querySelector('.ck-icon').textContent='⬜';
+    });
+    document.getElementById('check-warning').style.display='none';
+  }
+}
+
+function updateCheckBtn(){
+  // チェックされたらアイコンを更新
+  document.querySelectorAll('#inspection-checklist label').forEach(function(el){
+    el.querySelector('.ck-icon').textContent=el.classList.contains('checked')?'✅':'⬜';
+  });
+  document.getElementById('check-warning').style.display='none';
 }
 
 function loadIoItems(){
@@ -1020,6 +1087,18 @@ function submitIO(){
   var msg=document.getElementById('io-msg');
   if(!id){showMsg(msg,'品名を選択してください','var(--danger)');return;}
   if(!qty||qty<=0){showMsg(msg,'数量を入力してください','var(--danger)');return;}
+  // 入庫時は検収チェックリストを全チェック必須
+  if(ioType==='in'){
+    var unchecked=0;
+    document.querySelectorAll('#inspection-checklist label').forEach(function(el){
+      if(!el.classList.contains('checked')) unchecked++;
+    });
+    if(unchecked>0){
+      document.getElementById('check-warning').style.display='block';
+      document.getElementById('check-warning').scrollIntoView({behavior:'smooth',block:'center'});
+      return;
+    }
+  }
 
   var item=items[cat][id];
   var unit=item?item.unit:'';
@@ -1044,6 +1123,14 @@ function submitIO(){
 
   batch.commit().then(function(){
     showMsg(msg,'✅ 記録しました（在庫: '+afterQty+' '+unit+'）','var(--ok)');
+    // 検収チェックをリセット
+    document.querySelectorAll('#inspection-checklist label').forEach(function(el){
+      el.classList.remove('checked');
+      el.style.borderColor='var(--bd)';
+      el.style.background='#fff';
+      el.querySelector('.ck-icon').textContent='⬜';
+    });
+    document.getElementById('check-warning').style.display='none';
     document.getElementById('io-qty').value='';
     document.getElementById('io-note').value='';
     document.getElementById('io-lot').value='';
