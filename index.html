@@ -364,6 +364,10 @@ tr:hover td{background:#f5f3ff}
         <input type="date" id="io-expiry">
       </div>
       <div class="fg">
+        <label>担当者名 <span style="color:var(--danger);font-size:.8rem">※必須</span></label>
+        <input type="text" id="io-staff" placeholder="例：福士">
+      </div>
+      <div class="fg">
         <label>備考（任意）</label>
         <input type="text" id="io-note" placeholder="納品書No・使用先など">
       </div>
@@ -502,7 +506,7 @@ tr:hover td{background:#f5f3ff}
       <div class="card" style="padding:0">
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>日時</th><th>区分</th><th>品名</th><th>入庫</th><th>出庫/廃棄</th><th>調整後在庫</th><th>ロット</th><th>備考</th><th></th></tr></thead>
+            <thead><tr><th>日時</th><th>区分</th><th>品名</th><th>入庫</th><th>出庫/廃棄</th><th>調整後在庫</th><th>ロット</th><th>担当者</th><th>備考</th><th></th></tr></thead>
             <tbody id="hist-tbody"></tbody>
           </table>
         </div>
@@ -558,7 +562,7 @@ tr:hover td{background:#f5f3ff}
         </div>
         <div style="margin-top:.75rem;padding:.6rem .75rem;background:var(--bg3);border-radius:8px;font-size:.75rem;color:var(--muted);line-height:1.7">
           在庫マスター CSV：品名 / カテゴリ / 単位 / 内容量 / 内容量単位 / 現在在庫 / 安全在庫 / 発注点 / 仕入先 / 管理方式 / ABCランク<br>
-          入出庫履歴 CSV：日時 / 区分 / 品名 / カテゴリ / 入庫数 / 出庫数 / 調整後在庫 / ロット / 備考
+          入出庫履歴 CSV：日時 / 区分 / 品名 / カテゴリ / 入庫数 / 出庫数 / 調整後在庫 / ロット / 担当者 / 備考
         </div>
       </div>
 
@@ -1156,9 +1160,11 @@ function submitIO(){
   var id=document.getElementById('io-item').value;
   var qty=parseFloat(document.getElementById('io-qty').value);
   var note=document.getElementById('io-note').value.trim();
+  var staff=document.getElementById('io-staff').value.trim();
   var msg=document.getElementById('io-msg');
   if(!id){showMsg(msg,'品名を選択してください','var(--danger)');return;}
   if(!qty||qty<=0){showMsg(msg,'数量を入力してください','var(--danger)');return;}
+  if(!staff){showMsg(msg,'担当者名を入力してください','var(--danger)');document.getElementById('io-staff').focus();return;}
   // 入庫時は検収チェックリストを全チェック必須
   if(ioType==='in'){
     var unchecked=0;
@@ -1195,7 +1201,7 @@ function submitIO(){
 
   var tx={
     type:ioType, category:cat, itemId:id, itemName:item?item.name:'',
-    qty:qty, unit:unit, note:note, beforeQty:beforeQty, afterQty:afterQty,
+    qty:qty, unit:unit, note:note, staff:staff, beforeQty:beforeQty, afterQty:afterQty,
     timestamp:FS.serverTimestamp()
   };
   if(ioType==='in'){
@@ -1232,6 +1238,7 @@ function submitIO(){
     setInspectionPlaceholders();
     document.getElementById('io-qty').value='';
     document.getElementById('io-note').value='';
+    document.getElementById('io-staff').value='';
     document.getElementById('io-lot').value='';
     document.getElementById('io-expiry').value='';
     col('stock',afterQty);
@@ -1361,6 +1368,7 @@ function loadHist(){
         +'<td style="color:var(--warn)">'+outQ+'</td>'
         +'<td style="color:var(--ok);font-weight:700">'+(tx.afterQty!==undefined?tx.afterQty+' '+(tx.unit||''):'')+'</td>'
         +'<td style="font-size:.7rem;color:var(--muted)">'+esc(tx.lotNo||'')+'</td>'
+        +'<td style="font-size:.78rem;font-weight:700;color:var(--text)">'+esc(tx.staff||'')+'</td>'
         +'<td style="font-size:.7rem;color:var(--muted)">'+esc(tx.note||'')+'</td>'
         +'<td style="white-space:nowrap">'
           +'<button onclick="openHistEdit('+idx+')" style="background:var(--bg3);border:1.5px solid var(--bd);border-radius:7px;padding:.25rem .5rem;font-size:.72rem;font-weight:700;cursor:pointer;margin-right:.2rem">✏️</button>'
@@ -1761,7 +1769,7 @@ function exportHistCSV(){
   var q=db.collection('transactions').orderBy('timestamp','desc').limit(2000);
   if(cat!=='all') q=q.where('category','==',cat);
   q.get().then(function(snap){
-    var rows=[['日時','区分','品名','カテゴリ','入庫数','出庫数','廃棄数','調整後在庫','ロット番号','備考','仕入先']];
+    var rows=[['日時','区分','品名','カテゴリ','入庫数','出庫数','廃棄数','調整後在庫','ロット番号','担当者','備考','仕入先']];
     snap.forEach(function(d){
       var tx=d.data();
       if(!cats.includes(tx.category)) return;
@@ -1778,7 +1786,7 @@ function exportHistCSV(){
         CAT_LABEL[tx.category]||tx.category,
         inQ, outQ, disQ,
         tx.afterQty!==undefined?tx.afterQty:'',
-        tx.lotNo||'', tx.note||'', itemSup
+        tx.lotNo||'', tx.staff||'', tx.note||'', itemSup
       ]);
     });
     var label=cat==='all'?'全カテゴリ':CAT_LABEL[cat];
