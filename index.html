@@ -861,6 +861,27 @@ var TYPE_LABEL={in:'入庫',out:'出庫',discard:'廃棄',adjust:'棚卸し調�
 // ===================================================
 function startApp(){
   setInspectionPlaceholders();
+  // ===== 一回限りのデータ移行：対象品目をダンボール・単位:束に更新 =====
+  if(!localStorage.getItem('migrated_box_v1')){
+    var boxKeywords=['ダンボール','段ボール','ケースパット','パウチケース','2kg用ケース'];
+    db.collection('packaging').get().then(function(snap){
+      var batch=db.batch();
+      var count=0;
+      snap.forEach(function(doc){
+        var name=doc.data().name||'';
+        var hit=boxKeywords.some(function(kw){ return name.indexOf(kw)!==-1; });
+        if(hit){
+          batch.update(doc.ref,{pkgType:'box', unit:'束'});
+          count++;
+          console.log('[移行]', name);
+        }
+      });
+      batch.commit().then(function(){
+        console.log('[移行完了]', count+'件');
+        localStorage.setItem('migrated_box_v1','done');
+      }).catch(function(e){ console.error('[移行エラー]',e); });
+    });
+  }
   ['materials','packaging','products'].forEach(function(cat){
     var u=db.collection(cat).onSnapshot(function(snap){
       snap.forEach(function(d){ items[cat][d.id]=Object.assign({id:d.id},d.data()); });
