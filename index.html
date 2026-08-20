@@ -478,7 +478,8 @@ tr:hover td{background:#f5f3ff}
         <label>カテゴリ</label>
         <select id="tana-cat" onchange="renderTana()">
           <option value="materials">原材料</option>
-          <option value="packaging">包材</option>
+          <option value="packaging_bag">包材（袋）</option>
+          <option value="packaging_box">包材（ダンボール）</option>
           <option value="products">製品</option>
         </select>
       </div>
@@ -493,7 +494,8 @@ tr:hover td{background:#f5f3ff}
         <select id="h-cat" onchange="loadHist()">
           <option value="">すべて</option>
           <option value="materials">原材料</option>
-          <option value="packaging">包材</option>
+          <option value="packaging_bag">包材（袋）</option>
+          <option value="packaging_box">包材（ダンボール）</option>
           <option value="products">製品</option>
         </select>
         <select id="h-type" onchange="loadHist()">
@@ -863,8 +865,8 @@ var TYPE_LABEL={in:'入庫',out:'出庫',discard:'廃棄',adjust:'棚卸し調�
 function startApp(){
   setInspectionPlaceholders();
   // ===== 一回限りのデータ移行：対象品目をダンボール・単位:束に更新 =====
-  if(!localStorage.getItem('migrated_box_v2')){
-    var boxKeywords=['ダンボール','段ボール','ケースパット','パウチケース','2kg用ケース','鶏飯大用パット','ソース用パット','レトルトパウチパット'];
+  if(!localStorage.getItem('migrated_box_v3')){
+    var boxKeywords=['ダンボール','段ボール','ケースパット','パウチケース','2kg用ケース','鶏飯大用パット','ソース用パット','レトルトパウチパット','鶏飯大用ケース'];
     db.collection('packaging').get().then(function(snap){
       var batch=db.batch();
       var count=0;
@@ -879,7 +881,7 @@ function startApp(){
       });
       batch.commit().then(function(){
         console.log('[移行完了]', count+'件');
-        localStorage.setItem('migrated_box_v2','done');
+        localStorage.setItem('migrated_box_v3','done');
       }).catch(function(e){ console.error('[移行エラー]',e); });
     });
   }
@@ -1323,16 +1325,20 @@ function renderList(){
 //  棚卸し
 // ===================================================
 function renderTana(){
-  var cat=document.getElementById('tana-cat').value;
-  var arr=Object.values(items[cat]);
+  var catVal=document.getElementById('tana-cat').value;
+  var cat=catVal==='packaging_bag'||catVal==='packaging_box'?'packaging':catVal;
+  var pkgFilter=catVal==='packaging_bag'?'bag':catVal==='packaging_box'?'box':null;
+  var arr=Object.values(items[cat]||{});
+  if(pkgFilter) arr=arr.filter(function(item){ return (item.pkgType||'bag')===pkgFilter; });
   arr.sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ja');});
   var el=document.getElementById('tana-list');
   if(!arr.length){el.innerHTML='<div style="color:var(--muted);font-size:.8rem">品目なし</div>';return;}
   el.innerHTML=arr.map(function(item){
-    return '<div class="adj-row">'
-      +'<span class="adj-name">'+esc(item.name||'')+'<br><span style="font-size:.68rem;color:var(--muted)">'+esc(item.unit||'')+'</span></span>'
+    var unit=pkgFilter==='box'?'束':(item.unit||'');
+    return '<div class="adj-row" data-cat="'+cat+'">'
+      +'<span class="adj-name">'+esc(item.name||'')+'<br><span style="font-size:.68rem;color:var(--muted)">'+esc(unit)+'</span></span>'
       +'<span class="adj-sys" title="帳簿在庫">帳簿: '+(item.currentQty||0)+'</span>'
-      +'<input class="adj-input" type="number" min="0" step="0.01" placeholder="実数" data-id="'+item.id+'" data-sys="'+(item.currentQty||0)+'" oninput="calcDiff(this)">'
+      +'<input class="adj-input" type="number" min="0" step="0.01" placeholder="実数" data-id="'+item.id+'" data-cat="'+cat+'" data-sys="'+(item.currentQty||0)+'" data-unit="'+unit+'" oninput="calcDiff(this)">'
       +'<span class="adj-diff" id="diff-'+item.id+'">—</span>'
       +'</div>';
   }).join('');
@@ -1349,7 +1355,9 @@ function calcDiff(inp){
 }
 
 function commitTana(){
-  var cat=document.getElementById('tana-cat').value;
+  var catVal=document.getElementById('tana-cat').value;
+  var cat=catVal==='packaging_bag'||catVal==='packaging_box'?'packaging':catVal;
+  var pkgFilter=catVal==='packaging_bag'?'bag':catVal==='packaging_box'?'box':null;
   var inputs=document.querySelectorAll('.adj-input');
   var msg=document.getElementById('tana-msg');
   var batch=db.batch();
@@ -1362,10 +1370,11 @@ function commitTana(){
     var diff=actual-sys;
     var item=items[cat][id];
     if(!item) return;
+    var unit=inp.dataset.unit||item.unit||'';
     batch.update(db.collection(cat).doc(id),{currentQty:actual,updatedAt:FS.serverTimestamp()});
     batch.set(db.collection('transactions').doc(),{
       type:'adjust', category:cat, itemId:id, itemName:item.name,
-      qty:diff, unit:item.unit||'', beforeQty:sys, afterQty:actual,
+      qty:diff, unit:unit, beforeQty:sys, afterQty:actual,
       note:'棚卸し調整', timestamp:FS.serverTimestamp()
     });
     count++;
@@ -1385,14 +1394,29 @@ function commitTana(){
 var _histData = [];
 
 function loadHist(){
-  var cat=document.getElementById('h-cat').value;
+  var catVal=document.getElementById('h-cat').value;
   var type=document.getElementById('h-type').value;
   var tbody=document.getElementById('hist-tbody');
   tbody.innerHTML='<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:1rem">読み込み中...</td></tr>';
   db.collection('transactions').orderBy('timestamp','desc').limit(500).get().then(function(snap){
     var txs=[];
     snap.forEach(function(d){ txs.push(Object.assign({_id:d.id}, d.data())); });
-    if(cat) txs=txs.filter(function(tx){return tx.category===cat;});
+    // packaging_bag/packaging_boxはpackagingをpkgTypeで絞り込む
+    if(catVal==='packaging_bag'){
+      txs=txs.filter(function(tx){
+        if(tx.category!=='packaging') return false;
+        var item=items['packaging'][tx.itemId];
+        return !item||(item.pkgType||'bag')==='bag';
+      });
+    } else if(catVal==='packaging_box'){
+      txs=txs.filter(function(tx){
+        if(tx.category!=='packaging') return false;
+        var item=items['packaging'][tx.itemId];
+        return item&&item.pkgType==='box';
+      });
+    } else if(catVal){
+      txs=txs.filter(function(tx){return tx.category===catVal;});
+    }
     if(type) txs=txs.filter(function(tx){return tx.type===type;});
     txs=txs.slice(0,200);
     _histData=txs;
