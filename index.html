@@ -866,8 +866,8 @@ var TYPE_LABEL={in:'入庫',out:'出庫',discard:'廃棄',adjust:'棚卸し調�
 function startApp(){
   setInspectionPlaceholders();
   // ===== 一回限りのデータ移行：対象品目をダンボール・単位:束に更新 =====
-  if(!localStorage.getItem('migrated_box_v3')){
-    var boxKeywords=['ダンボール','段ボール','ケースパット','パウチケース','2kg用ケース','鶏飯大用パット','ソース用パット','レトルトパウチパット','鶏飯大用ケース'];
+  if(!localStorage.getItem('migrated_box_v4')){
+    var boxKeywords=['ダンボール','段ボール','ケースパット','パウチケース','2kg用ケース','鶏飯大用パット','ソース用パット','レトルトパウチパット','鶏飯大用ケース','鶏飯小用ケース'];
     db.collection('packaging').get().then(function(snap){
       var batch=db.batch();
       var count=0;
@@ -882,7 +882,7 @@ function startApp(){
       });
       batch.commit().then(function(){
         console.log('[移行完了]', count+'件');
-        localStorage.setItem('migrated_box_v3','done');
+        localStorage.setItem('migrated_box_v4','done');
       }).catch(function(e){ console.error('[移行エラー]',e); });
     });
   }
