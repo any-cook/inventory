@@ -1063,8 +1063,9 @@ function setType(t){
   document.getElementById('rec-btn').className='btn-rec'+(t==='out'?' out':t==='discard'?' discard':'');
   document.getElementById('lot-field').style.display=t==='in'?'flex':'none';
   document.getElementById('expiry-field').style.display=t==='in'?'block':'none';
-  // 検収チェックリストは入庫時のみ表示
-  document.getElementById('inspection-checklist').style.display=t==='in'?'block':'none';
+  // 検収チェックリストは入庫かつ原材料のみ表示
+  var isCatMaterials=document.getElementById('io-cat').value==='materials';
+  document.getElementById('inspection-checklist').style.display=(t==='in'&&isCatMaterials)?'block':'none';
   // チェックをリセット
   if(t==='in'){
     document.querySelectorAll('#inspection-checklist label').forEach(function(el){
@@ -1171,6 +1172,10 @@ function loadIoItems(){
     if(item.id===cur) o.selected=true;
     sel.appendChild(o);
   });
+  // カテゴリ変更時にチェックリストの表示を更新（原材料入庫のみ表示）
+  var ioType_=document.querySelector('.tbtn.on')?document.querySelector('.tbtn.on').id.replace('tb-',''):'in';
+  var isMaterials=catVal==='materials';
+  document.getElementById('inspection-checklist').style.display=(ioType_==='in'&&isMaterials)?'block':'none';
   if(cur) onItemSelect();
 }
 
@@ -1209,8 +1214,8 @@ function submitIO(){
   if(!id){showMsg(msg,'品名を選択してください','var(--danger)');return;}
   if(!qty||qty<=0){showMsg(msg,'数量を入力してください','var(--danger)');return;}
   if(!staff){showMsg(msg,'担当者名を入力してください','var(--danger)');document.getElementById('io-staff').focus();return;}
-  // 入庫時は検収チェックリストを全チェック必須
-  if(ioType==='in'){
+  // 入庫かつ原材料のみ検収チェックリストを必須
+  if(ioType==='in'&&catVal==='materials'){
     var unchecked=0;
     document.querySelectorAll('#inspection-checklist label').forEach(function(el){
       if(!el.classList.contains('checked')) unchecked++;
