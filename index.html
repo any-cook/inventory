@@ -449,7 +449,8 @@ tr:hover td{background:#f5f3ff}
         <select id="list-cat" onchange="renderList()" style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:.5rem .6rem;color:var(--text);font-size:.78rem">
           <option value="">すべて</option>
           <option value="materials">原材料</option>
-          <option value="packaging">包材</option>
+          <option value="packaging_bag">包材（袋）</option>
+          <option value="packaging_box">包材（ダンボール）</option>
           <option value="products">製品</option>
         </select>
         <select id="list-supplier" onchange="renderList()" style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:.5rem .6rem;color:var(--text);font-size:.78rem">
@@ -1699,8 +1700,14 @@ function renderList(){
   var sup=(document.getElementById('list-supplier').value||'');
   var tbody=document.getElementById('list-tbody');
   var arr=[];
-  var cats=cat?[cat]:['materials','packaging','products'];
+  // packaging_bag/packaging_boxはpackagingをpkgTypeで絞り込む
+  var pkgFilter=null;
+  var realCat=cat;
+  if(cat==='packaging_bag'){  realCat='packaging'; pkgFilter='bag'; }
+  if(cat==='packaging_box'){  realCat='packaging'; pkgFilter='box'; }
+  var cats=realCat?[realCat]:['materials','packaging','products'];
   cats.forEach(function(c){ arr=arr.concat(Object.values(items[c]).map(function(i){return Object.assign({_cat:c},i);})); });
+  if(pkgFilter) arr=arr.filter(function(i){ return i._cat==='packaging'&&(i.pkgType||'bag')===pkgFilter; });
   if(q)   arr=arr.filter(function(i){return (i.name||'').toLowerCase().indexOf(q)!==-1;});
   if(sup) arr=arr.filter(function(i){return (i.supplier||'')=== sup;});
   arr.sort(function(a,b){
