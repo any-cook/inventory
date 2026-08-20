@@ -314,7 +314,8 @@ tr:hover td{background:#f5f3ff}
         <label>カテゴリ</label>
         <select id="io-cat" onchange="loadIoItems()">
           <option value="materials">原材料</option>
-          <option value="packaging">包材</option>
+          <option value="packaging_bag">包材（袋）</option>
+          <option value="packaging_box">包材（ダンボール）</option>
           <option value="products">製品</option>
         </select>
       </div>
@@ -862,8 +863,8 @@ var TYPE_LABEL={in:'入庫',out:'出庫',discard:'廃棄',adjust:'棚卸し調�
 function startApp(){
   setInspectionPlaceholders();
   // ===== 一回限りのデータ移行：対象品目をダンボール・単位:束に更新 =====
-  if(!localStorage.getItem('migrated_box_v1')){
-    var boxKeywords=['ダンボール','段ボール','ケースパット','パウチケース','2kg用ケース'];
+  if(!localStorage.getItem('migrated_box_v2')){
+    var boxKeywords=['ダンボール','段ボール','ケースパット','パウチケース','2kg用ケース','鶏飯大用パット','ソース用パット','レトルトパウチパット'];
     db.collection('packaging').get().then(function(snap){
       var batch=db.batch();
       var count=0;
@@ -878,7 +879,7 @@ function startApp(){
       });
       batch.commit().then(function(){
         console.log('[移行完了]', count+'件');
-        localStorage.setItem('migrated_box_v1','done');
+        localStorage.setItem('migrated_box_v2','done');
       }).catch(function(e){ console.error('[移行エラー]',e); });
     });
   }
@@ -1135,18 +1136,35 @@ function setInspectionPlaceholders(){
 }
 
 function loadIoItems(){
-  var cat=document.getElementById('io-cat').value;
+  var catVal=document.getElementById('io-cat').value;
   var sel=document.getElementById('io-item');
   var cur=sel.value;
   sel.innerHTML='<option value="">選択してください</option>';
   document.getElementById('io-unit').value='';
   col('in','-'); col('out','-'); col('stock','-');
-  var arr=Object.values(items[cat]);
+
+  // packaging_bag / packaging_box は packaging コレクションをフィルタリング
+  var cat=catVal;
+  var pkgFilter=null;
+  if(catVal==='packaging_bag'){  cat='packaging'; pkgFilter='bag'; }
+  if(catVal==='packaging_box'){  cat='packaging'; pkgFilter='box'; }
+
+  var arr=Object.values(items[cat]||{});
+  if(pkgFilter){
+    arr=arr.filter(function(item){
+      // pkgTypeがない旧データは袋扱い
+      var t=item.pkgType||'bag';
+      return t===pkgFilter;
+    });
+  }
   arr.sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ja');});
   arr.forEach(function(item){
     var o=document.createElement('option');
     o.value=item.id; o.textContent=item.name;
-    o.dataset.unit=item.unit||'';
+    // ダンボールカテゴリは単位を「束」で統一
+    var unit=pkgFilter==='box'?'束':(item.unit||'');
+    o.dataset.unit=unit;
+    o.dataset.cat='packaging';
     if(item.id===cur) o.selected=true;
     sel.appendChild(o);
   });
@@ -1154,7 +1172,8 @@ function loadIoItems(){
 }
 
 function onItemSelect(){
-  var cat=document.getElementById('io-cat').value;
+  var catVal=document.getElementById('io-cat').value;
+  var cat=catVal==='packaging_bag'||catVal==='packaging_box'?'packaging':catVal;
   var id=document.getElementById('io-item').value;
   var opt=document.getElementById('io-item').options[document.getElementById('io-item').selectedIndex];
   document.getElementById('io-unit').value=opt&&opt.dataset.unit||'';
@@ -1177,7 +1196,8 @@ function onItemSelect(){
 function col(id,val){ document.getElementById('col-'+id).textContent=val; }
 
 function submitIO(){
-  var cat=document.getElementById('io-cat').value;
+  var catVal=document.getElementById('io-cat').value;
+  var cat=catVal==='packaging_bag'||catVal==='packaging_box'?'packaging':catVal;
   var id=document.getElementById('io-item').value;
   var qty=parseFloat(document.getElementById('io-qty').value);
   var note=document.getElementById('io-note').value.trim();
