@@ -800,7 +800,7 @@ tr:hover td{background:#f5f3ff}
       <label>賞味期限</label>
       <input type="date" id="m-expiry-date">
       <div style="font-size:.75rem;color:var(--muted);margin-top:.3rem;line-height:1.6;background:var(--bg3);border-radius:8px;padding:.5rem .7rem">
-        入庫時に登録された賞味期限です。直接修正できます。<br>
+        賞味期限を設定します。直接修正できます。<br>
         期限切れ・30日以内になるとアラートに表示されます。
       </div>
     </div>
@@ -956,7 +956,7 @@ function makeIrow(item){
   var dbin=item.mgmt==='dbin'?'<span class="dbin" style="margin-left:.3rem">ダブルビン</span>':'';
   // 賞味期限表示（原材料のみ）
   var expiryHtml='';
-  if(item._cat==='materials'&&item.expiryDate){
+  if((item._cat==='materials'||item._cat==='products')&&item.expiryDate){
     var today=new Date(); today.setHours(0,0,0,0);
     var expDate=new Date(item.expiryDate);
     var diffDays=Math.ceil((expDate-today)/(1000*60*60*24));
@@ -1045,7 +1045,7 @@ function renderAlerts(){
       var qty=item.currentQty||0;
       var rp=item.reorderPoint||0;
       if(rp>0&&qty<=rp) alerts.push({type:'reorder',msg:lbl+'「'+item.name+'」が発注点以下（'+qty+' '+item.unit+'）'});
-      if(item.expiryDate && cat==='materials'){
+      if(item.expiryDate && (cat==='materials'||cat==='products')){
         var exp=new Date(item.expiryDate);
         var diffD=Math.ceil((exp-today)/(1000*60*60*24));
         var expTxt=item.expiryDate.replace(/-/g,'/');
@@ -1692,7 +1692,7 @@ function renderMaster(){
 function syncModalFields(){
   var v=document.getElementById('m-cat-sel').value;
   document.getElementById('m-expiry-row').style.display=v==='products'?'block':'none';
-  document.getElementById('m-expiry-date-row').style.display=v==='materials'?'block':'none';
+  document.getElementById('m-expiry-date-row').style.display=(v==='materials'||v==='products')?'block':'none';
   document.getElementById('m-capacity-row').style.display=v==='packaging'?'block':'none';
   document.getElementById('m-storage-row').style.display=v==='materials'?'block':'none';
   document.getElementById('m-pkgtype-row').style.display=v==='packaging'?'block':'none';
@@ -1755,7 +1755,7 @@ function openEdit(cat,id){
   document.getElementById('m-expiry-row').style.display=cat==='products'?'block':'none';
   // 原材料の賞味期限（日付）
   document.getElementById('m-expiry-date').value=item.expiryDate||'';
-  document.getElementById('m-expiry-date-row').style.display=cat==='materials'?'block':'none';
+  document.getElementById('m-expiry-date-row').style.display=(cat==='materials'||cat==='products')?'block':'none';
   document.getElementById('item-modal').classList.remove('hide');
 }
 function closeModal(){ document.getElementById('item-modal').classList.add('hide'); }
@@ -1777,8 +1777,8 @@ function saveItem(){
   };
   var ed=document.getElementById('m-edays').value;
   if(ed) data.expiryDays=parseInt(ed);
-  // 原材料の賞味期限日付
-  if(cat==='materials'){
+  // 原材料・製品の賞味期限日付
+  if(cat==='materials'||cat==='products'){
     var exd=document.getElementById('m-expiry-date').value;
     if(exd) data.expiryDate=exd;
     else data.expiryDate=firebase.firestore.FieldValue.delete();
@@ -1874,7 +1874,7 @@ function renderList(){
     }
     // 賞味期限セル（原材料のみ）
     var expiryCell='<td></td>';
-    if(item._cat==='materials'&&item.expiryDate){
+    if((item._cat==='materials'||item._cat==='products')&&item.expiryDate){
       var today2=new Date(); today2.setHours(0,0,0,0);
       var expDate2=new Date(item.expiryDate);
       var diff2=Math.ceil((expDate2-today2)/(1000*60*60*24));
