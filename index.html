@@ -651,20 +651,37 @@ tr:hover td{background:#f5f3ff}
 
 <!-- ===== 履歴編集モーダル ===== -->
 <div class="modal-bg hide" id="hist-edit-modal">
-  <div class="modal" style="max-width:420px;border-radius:20px;margin:auto">
+  <div class="modal" style="max-width:440px;border-radius:20px;margin:auto">
     <div class="modal-hd">
       <span class="modal-title">✏️ 履歴を編集</span>
       <button class="modal-close" onclick="document.getElementById('hist-edit-modal').classList.add('hide')">&times;</button>
     </div>
     <input type="hidden" id="he-idx">
     <input type="hidden" id="he-id">
-    <div style="background:var(--bg3);border-radius:10px;padding:.65rem .85rem;margin-bottom:.9rem;font-size:.88rem">
-      <strong id="he-item" style="color:var(--text)"></strong>
-      <span id="he-type" style="color:var(--muted);margin-left:.5rem;font-size:.8rem"></span>
+    <input type="hidden" id="he-orig-qty">
+    <input type="hidden" id="he-orig-type">
+    <div class="fg">
+      <label>区分</label>
+      <select id="he-type-sel">
+        <option value="in">入庫</option>
+        <option value="out">出庫</option>
+        <option value="discard">廃棄</option>
+        <option value="adjust">調整</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>品名</label>
+      <select id="he-item-sel" onchange="onHeItemChange()">
+        <option value="">選択してください</option>
+      </select>
     </div>
     <div class="fg">
       <label>数量 <span id="he-unit" style="color:var(--muted);font-weight:500"></span></label>
       <input type="number" id="he-qty" min="0" step="0.01">
+    </div>
+    <div class="fg">
+      <label>担当者</label>
+      <input type="text" id="he-staff" placeholder="例：福士">
     </div>
     <div class="fg">
       <label>ロットNo</label>
@@ -1454,17 +1471,51 @@ function loadHist(){
 }
 
 // 履歴編集モーダルを開く
+// 品目セレクトに全品目を追加（カテゴリグループ付き）
+function buildHeItemSel(currentCat, currentItemId){
+  var sel=document.getElementById('he-item-sel');
+  sel.innerHTML='';
+  var catMap={materials:'原材料',packaging:'包材',products:'製品'};
+  ['materials','packaging','products'].forEach(function(cat){
+    var arr=Object.values(items[cat]||{});
+    arr.sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ja');});
+    if(!arr.length) return;
+    var og=document.createElement('optgroup');
+    og.label=catMap[cat];
+    arr.forEach(function(item){
+      var o=document.createElement('option');
+      o.value=cat+'::'+item.id;
+      o.textContent=item.name;
+      o.dataset.unit=item.pkgType==='box'?'束':(item.unit||'');
+      if(cat===currentCat && item.id===currentItemId) o.selected=true;
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+}
+
+// 品目変更時に単位を更新
+function onHeItemChange(){
+  var sel=document.getElementById('he-item-sel');
+  var opt=sel.options[sel.selectedIndex];
+  document.getElementById('he-unit').textContent=opt&&opt.dataset.unit||'';
+}
+
 function openHistEdit(idx){
   var tx=_histData[idx];
   if(!tx) return;
   document.getElementById('he-idx').value=idx;
   document.getElementById('he-id').value=tx._id;
-  document.getElementById('he-item').textContent=tx.itemName||'';
-  document.getElementById('he-type').textContent=tx.type==='in'?'入庫':tx.type==='out'?'出庫':tx.type==='discard'?'廃棄':'調整';
+  document.getElementById('he-orig-qty').value=Math.abs(tx.qty)||0;
+  document.getElementById('he-orig-type').value=tx.type;
+  document.getElementById('he-type-sel').value=tx.type||'in';
   document.getElementById('he-qty').value=Math.abs(tx.qty)||0;
+  document.getElementById('he-staff').value=tx.staff||'';
   document.getElementById('he-lot').value=tx.lotNo||'';
   document.getElementById('he-note').value=tx.note||'';
   document.getElementById('he-unit').textContent=tx.unit||'';
+  document.getElementById('he-msg').textContent='';
+  buildHeItemSel(tx.category, tx.itemId);
   document.getElementById('hist-edit-modal').classList.remove('hide');
 }
 
@@ -1473,33 +1524,70 @@ function saveHistEdit(){
   var idx=parseInt(document.getElementById('he-idx').value);
   var docId=document.getElementById('he-id').value;
   var tx=_histData[idx];
+  var newType=document.getElementById('he-type-sel').value;
   var newQty=parseFloat(document.getElementById('he-qty').value)||0;
+  var staff=document.getElementById('he-staff').value.trim();
   var lot=document.getElementById('he-lot').value.trim();
   var note=document.getElementById('he-note').value.trim();
   var msgEl=document.getElementById('he-msg');
+
+  // 品目の取得
+  var itemSel=document.getElementById('he-item-sel');
+  var itemOpt=itemSel.options[itemSel.selectedIndex];
+  var itemVal=itemOpt?itemOpt.value:'';
+  var newCat=itemVal.split('::')[0]||tx.category;
+  var newItemId=itemVal.split('::')[1]||tx.itemId;
+  var newItemName=itemOpt?itemOpt.textContent:(tx.itemName||'');
+  var newUnit=itemOpt?itemOpt.dataset.unit:(tx.unit||'');
+
   msgEl.textContent='保存中...'; msgEl.style.color='var(--muted)';
 
-  // 在庫の差分補正
+  // 旧在庫を元に戻す → 新しい値を反映
   var oldQty=Math.abs(tx.qty)||0;
-  var diff=newQty-oldQty;
-  var isOut=tx.type==='out'||tx.type==='discard';
-  var stockDiff=isOut?-diff:diff;
+  var wasOut=tx.type==='out'||tx.type==='discard';
+  var oldStockDiff=wasOut?oldQty:-oldQty; // 旧レコードを打ち消す方向
+  var isOut=newType==='out'||newType==='discard';
+  var newStockDiff=isOut?-newQty:newQty;  // 新レコードの在庫影響
 
   var batch=db.batch();
+
   // 履歴ドキュメントを更新
   batch.update(db.collection('transactions').doc(docId),{
+    type: newType,
+    category: newCat,
+    itemId: newItemId,
+    itemName: newItemName,
+    unit: newUnit,
     qty: isOut?-newQty:newQty,
-    afterQty: (tx.afterQty||0)+stockDiff,
+    afterQty: (tx.afterQty||0)+oldStockDiff+newStockDiff,
+    staff: staff,
     lotNo: lot,
     note: note
   });
-  // 品目の現在在庫を補正
-  if(tx.itemId && tx.category && stockDiff!==0){
-    var colName=tx.category==='materials'?'materials':tx.category==='packaging'?'packaging':'products';
-    batch.update(db.collection(colName).doc(tx.itemId),{
-      currentQty: firebase.firestore.FieldValue.increment(stockDiff)
+
+  // 旧品目の在庫を打ち消し
+  if(tx.itemId && tx.category){
+    var oldCol=tx.category==='materials'?'materials':tx.category==='packaging'?'packaging':'products';
+    batch.update(db.collection(oldCol).doc(tx.itemId),{
+      currentQty: firebase.firestore.FieldValue.increment(oldStockDiff)
     });
   }
+  // 新品目の在庫に反映（品目が変わった場合も対応）
+  if(newItemId && newCat){
+    var newCol=newCat==='materials'?'materials':newCat==='packaging'?'packaging':'products';
+    if(newItemId===tx.itemId && newCat===tx.category){
+      // 同じ品目 → 差分だけ追加
+      batch.update(db.collection(newCol).doc(newItemId),{
+        currentQty: firebase.firestore.FieldValue.increment(newStockDiff)
+      });
+    } else {
+      // 品目が変わった場合 → 新品目に反映
+      batch.update(db.collection(newCol).doc(newItemId),{
+        currentQty: firebase.firestore.FieldValue.increment(newStockDiff)
+      });
+    }
+  }
+
   batch.commit().then(function(){
     msgEl.textContent='✅ 保存しました'; msgEl.style.color='var(--ok)';
     setTimeout(function(){
