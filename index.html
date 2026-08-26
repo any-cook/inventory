@@ -796,6 +796,14 @@ tr:hover td{background:#f5f3ff}
         パウチ・袋・ボトルなど容器の充填容量を入力。例：200ml、1kg、500g
       </div>
     </div>
+    <div class="fg" id="m-expiry-date-row" style="display:none">
+      <label>賞味期限</label>
+      <input type="date" id="m-expiry-date">
+      <div style="font-size:.75rem;color:var(--muted);margin-top:.3rem;line-height:1.6;background:var(--bg3);border-radius:8px;padding:.5rem .7rem">
+        入庫時に登録された賞味期限です。直接修正できます。<br>
+        期限切れ・30日以内になるとアラートに表示されます。
+      </div>
+    </div>
     <div class="fg" id="m-expiry-row" style="display:none">
       <label>賞味期限日数（製品のみ）</label>
       <input type="number" id="m-edays" min="1" placeholder="例：730">
@@ -1684,6 +1692,7 @@ function renderMaster(){
 function syncModalFields(){
   var v=document.getElementById('m-cat-sel').value;
   document.getElementById('m-expiry-row').style.display=v==='products'?'block':'none';
+  document.getElementById('m-expiry-date-row').style.display=v==='materials'?'block':'none';
   document.getElementById('m-capacity-row').style.display=v==='packaging'?'block':'none';
   document.getElementById('m-storage-row').style.display=v==='materials'?'block':'none';
   document.getElementById('m-pkgtype-row').style.display=v==='packaging'?'block':'none';
@@ -1704,6 +1713,7 @@ function openAdd(){
   document.getElementById('m-edays').value='';
   document.getElementById('m-storage').value='ambient';
   document.getElementById('m-pkgtype').value='bag';
+  document.getElementById('m-expiry-date').value='';
   document.getElementById('m-cat-sel').value='materials';
   syncModalFields();
   document.getElementById('item-modal').classList.remove('hide');
@@ -1743,6 +1753,9 @@ function openEdit(cat,id){
   document.getElementById('m-pkgtype-row').style.display=cat==='packaging'?'block':'none';
   document.getElementById('m-edays').value=item.expiryDays||'';
   document.getElementById('m-expiry-row').style.display=cat==='products'?'block':'none';
+  // 原材料の賞味期限（日付）
+  document.getElementById('m-expiry-date').value=item.expiryDate||'';
+  document.getElementById('m-expiry-date-row').style.display=cat==='materials'?'block':'none';
   document.getElementById('item-modal').classList.remove('hide');
 }
 function closeModal(){ document.getElementById('item-modal').classList.add('hide'); }
@@ -1764,6 +1777,12 @@ function saveItem(){
   };
   var ed=document.getElementById('m-edays').value;
   if(ed) data.expiryDays=parseInt(ed);
+  // 原材料の賞味期限日付
+  if(cat==='materials'){
+    var exd=document.getElementById('m-expiry-date').value;
+    if(exd) data.expiryDate=exd;
+    else data.expiryDate=firebase.firestore.FieldValue.delete();
+  }
   var cap=document.getElementById('m-capacity').value;
   var capUnit=document.getElementById('m-capacity-unit').value.trim();
   if(cat==='packaging'&&cap) { data.capacity=parseFloat(cap); data.capacityUnit=capUnit||''; }
