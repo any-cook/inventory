@@ -61,7 +61,7 @@ input,select{font-family:var(--font);font-size:inherit}
 .btn-logout:hover{border-color:var(--accent);color:var(--accent)}
 
 /* ===== タブ ===== */
-#tabs{display:flex;overflow-x:auto;background:#fff;border-bottom:2px solid var(--bd);scrollbar-width:none;padding:0 .4rem}
+#tabs{display:flex;overflow-x:auto;background:#fff;border-bottom:2px solid var(--bd);scrollbar-width:none;padding:0 .4rem;position:sticky;top:57px;z-index:99;box-shadow:0 2px 6px rgba(99,102,241,.06)}
 #tabs::-webkit-scrollbar{display:none}
 .tab{flex-shrink:0;padding:.75rem 1.1rem;font-size:.88rem;font-weight:700;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s}
 .tab.on{color:var(--accent);border-bottom-color:var(--accent)}
@@ -408,7 +408,7 @@ tr:hover td{background:#f5f3ff}
             <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem">📦</span>
             <div style="flex:1">
               <div style="font-weight:800;font-size:.9rem;color:var(--text);margin-bottom:.25rem">③ 外装・衛生</div>
-              <div style="font-size:.78rem;color:var(--muted);line-height:1.6">著しい変形・破れ・濡れ・汚れがないこと・テープの剥がれや開封痕がないこと<br>水濡れや霜つきは温度変化（一度溶けた）のサイン<br>段ボールの潰れ・破れは異物混入リスクとして判断</div>
+              <div style="font-size:.78rem;color:var(--muted);line-height:1.6">著しい変形・破れ・濡れ・汚れがないこと・テープの剥がれや開封痕がないこと<br><span style="color:var(--danger);font-weight:700">⚠️ 水濡れ・霜つきは返品対象（一度溶けた可能性あり）</span><br>段ボールの潰れ・破れは異物混入リスクとして判断</div>
             </div>
             <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem" class="ck-icon">⬜</span>
           </label>
@@ -461,7 +461,7 @@ tr:hover td{background:#f5f3ff}
       <div class="card" style="padding:0">
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>品名</th><th>内容量</th><th>カテゴリ</th><th>在庫</th><th>発注点</th><th>状態</th><th>管理</th><th></th></tr></thead>
+            <thead><tr><th>品名</th><th>内容量</th><th>カテゴリ</th><th>在庫</th><th>発注点</th><th>賞味期限</th><th>状態</th><th>管理</th><th></th></tr></thead>
             <tbody id="list-tbody"></tbody>
           </table>
         </div>
@@ -946,8 +946,19 @@ function makeIrow(item){
   var cls=qty<=rp&&rp>0?'danger':qty<=ss&&ss>0?'warn':'ok';
   var statusTxt=cls==='danger'?'要発注':cls==='warn'?'注意':'在庫あり';
   var dbin=item.mgmt==='dbin'?'<span class="dbin" style="margin-left:.3rem">ダブルビン</span>':'';
+  // 賞味期限表示（原材料のみ）
+  var expiryHtml='';
+  if(item._cat==='materials'&&item.expiryDate){
+    var today=new Date(); today.setHours(0,0,0,0);
+    var expDate=new Date(item.expiryDate);
+    var diffDays=Math.ceil((expDate-today)/(1000*60*60*24));
+    var expColor=diffDays<0?'var(--danger)':diffDays<=30?'var(--warn)':'var(--muted)';
+    var expIcon=diffDays<0?'🚨':diffDays<=30?'⚠️':'📅';
+    var expTxt=item.expiryDate.replace(/-/g,'/');
+    expiryHtml='<div style="font-size:.68rem;color:'+expColor+';font-weight:700;margin-top:.15rem">'+expIcon+' 賞味期限：'+expTxt+(diffDays<0?' (期限切れ)':diffDays<=30?' (あと'+diffDays+'日)':'')+'</div>';
+  }
   return '<div class="irow '+cls+'">'
-    +'<div class="irow-name">'+esc(item.name||'')+dbin+'</div>'
+    +'<div class="irow-name" style="flex-direction:column;align-items:flex-start">'+esc(item.name||'')+dbin+expiryHtml+'</div>'
     +'<div class="irow-bar"><div class="irow-bar-inner" style="width:'+pct+'%"></div></div>'
     +'<div class="irow-qty">'+qty+'</div>'
     +'<div class="irow-unit">'+esc(item.unit||'')+'</div>'
@@ -1026,10 +1037,12 @@ function renderAlerts(){
       var qty=item.currentQty||0;
       var rp=item.reorderPoint||0;
       if(rp>0&&qty<=rp) alerts.push({type:'reorder',msg:lbl+'「'+item.name+'」が発注点以下（'+qty+' '+item.unit+'）'});
-      if(item.expiryDate){
+      if(item.expiryDate && cat==='materials'){
         var exp=new Date(item.expiryDate);
-        if(exp<today) alerts.push({type:'expiry',msg:lbl+'「'+item.name+'」の賞味期限切れ（'+item.expiryDate+'）'});
-        else if(exp<=in30) alerts.push({type:'expiry',msg:lbl+'「'+item.name+'」賞味期限30日以内（'+item.expiryDate+'）'});
+        var diffD=Math.ceil((exp-today)/(1000*60*60*24));
+        var expTxt=item.expiryDate.replace(/-/g,'/');
+        if(exp<today) alerts.push({type:'expiry',msg:'🚨 '+lbl+'「'+item.name+'」賞味期限切れ（'+expTxt+'）'});
+        else if(exp<=in30) alerts.push({type:'expiry',msg:'⚠️ '+lbl+'「'+item.name+'」賞味期限まであと'+diffD+'日（'+expTxt+'）'});
       }
     });
   });
@@ -1279,7 +1292,16 @@ function submitIO(){
   var batch=db.batch();
   batch.set(db.collection('transactions').doc(), tx);
   var delta=ioType==='in'?qty:-qty;
-  batch.update(db.collection(cat).doc(id),{currentQty:FS.increment(delta),updatedAt:FS.serverTimestamp()});
+  var masterUpdate={currentQty:FS.increment(delta),updatedAt:FS.serverTimestamp()};
+  // 入庫時に賞味期限を品目マスターにも保存（アラート用）
+  if(ioType==='in'){
+    var expVal=document.getElementById('ck-expiry-val').value.trim()||document.getElementById('io-expiry').value;
+    if(expVal){
+      // スラッシュ区切りをハイフン区切りに変換
+      masterUpdate.expiryDate=expVal.replace(/\//g,'-');
+    }
+  }
+  batch.update(db.collection(cat).doc(id), masterUpdate);
 
   batch.commit().then(function(){
     showMsg(msg,'✅ 記録しました（在庫: '+afterQty+' '+unit+'）','var(--ok)');
@@ -1813,7 +1835,7 @@ function renderList(){
   arr.forEach(function(item){
     var sup2=item.supplier||'（仕入先未設定）';
     if(sup2!==lastSup){
-      rows+='<tr><td colspan="8" style="background:var(--bg3);padding:.35rem .6rem;font-size:.72rem;font-weight:700;color:var(--info)">🏭 '+esc(sup2)+'</td></tr>';
+      rows+='<tr><td colspan="9" style="background:var(--bg3);padding:.35rem .6rem;font-size:.72rem;font-weight:700;color:var(--info)">🏭 '+esc(sup2)+'</td></tr>';
       lastSup=sup2;
     }
     var qty=item.currentQty||0, rp=item.reorderPoint||0, ss=item.safetyStock||0;
@@ -1831,11 +1853,22 @@ function renderList(){
       var pt=item.pkgType||'bag';
       storageTag=pt==='box'?'<span class="b" style="background:#fce7f3;color:#9d174d">📦ダンボール</span>':'<span class="b" style="background:#f3e8ff;color:#7e22ce">👜袋</span>';
     }
+    // 賞味期限セル（原材料のみ）
+    var expiryCell='<td></td>';
+    if(item._cat==='materials'&&item.expiryDate){
+      var today2=new Date(); today2.setHours(0,0,0,0);
+      var expDate2=new Date(item.expiryDate);
+      var diff2=Math.ceil((expDate2-today2)/(1000*60*60*24));
+      var expColor2=diff2<0?'var(--danger)':diff2<=30?'var(--warn)':'var(--ok)';
+      var expIcon2=diff2<0?'🚨':diff2<=30?'⚠️':'✅';
+      expiryCell='<td style="font-size:.75rem;font-weight:700;color:'+expColor2+'">'+expIcon2+' '+item.expiryDate.replace(/-/g,'/')+(diff2<0?' 期限切れ':diff2<=30?' あと'+diff2+'日':'')+'</td>';
+    }
     rows+='<tr><td style="padding-left:1.2rem"><strong>'+esc(item.name||'')+'</strong> '+storageTag+'</td>'
       +'<td>'+capDisp+'</td>'
       +'<td><span class="b b-gray">'+CAT_LABEL[item._cat]+'</span></td>'
       +'<td><strong>'+qty+'</strong> <span style="color:var(--muted);font-size:.7rem">'+esc(item.unit||'')+'</span></td>'
       +'<td style="color:var(--muted)">'+rp+'</td>'
+      +expiryCell
       +'<td>'+sb+'</td>'
       +'<td>'+mgmtb+'</td>'
       +'<td style="white-space:nowrap">'
