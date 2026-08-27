@@ -1595,23 +1595,26 @@ function saveHistEdit(){
     note: note
   });
 
-  // 旧品目の在庫を打ち消し
-  if(tx.itemId && tx.category){
-    var oldCol=tx.category==='materials'?'materials':tx.category==='packaging'?'packaging':'products';
-    batch.update(db.collection(oldCol).doc(tx.itemId),{
-      currentQty: firebase.firestore.FieldValue.increment(oldStockDiff)
-    });
-  }
-  // 新品目の在庫に反映（品目が変わった場合も対応）
-  if(newItemId && newCat){
-    var newCol=newCat==='materials'?'materials':newCat==='packaging'?'packaging':'products';
-    if(newItemId===tx.itemId && newCat===tx.category){
-      // 同じ品目 → 差分だけ追加
-      batch.update(db.collection(newCol).doc(newItemId),{
-        currentQty: firebase.firestore.FieldValue.increment(newStockDiff)
+  // 在庫補正：同じ品目か別品目かで処理を分ける
+  if(newItemId===tx.itemId && newCat===tx.category){
+    // 同じ品目 → 旧記録を打ち消し＋新記録を一度のincrementで適用
+    var totalDiff=oldStockDiff+newStockDiff;
+    if(totalDiff!==0){
+      var sameCol=newCat==='materials'?'materials':newCat==='packaging'?'packaging':'products';
+      batch.update(db.collection(sameCol).doc(newItemId),{
+        currentQty: firebase.firestore.FieldValue.increment(totalDiff)
       });
-    } else {
-      // 品目が変わった場合 → 新品目に反映
+    }
+  } else {
+    // 別品目 → 旧品目の在庫を打ち消し、新品目に反映
+    if(tx.itemId && tx.category){
+      var oldCol=tx.category==='materials'?'materials':tx.category==='packaging'?'packaging':'products';
+      batch.update(db.collection(oldCol).doc(tx.itemId),{
+        currentQty: firebase.firestore.FieldValue.increment(oldStockDiff)
+      });
+    }
+    if(newItemId && newCat){
+      var newCol=newCat==='materials'?'materials':newCat==='packaging'?'packaging':'products';
       batch.update(db.collection(newCol).doc(newItemId),{
         currentQty: firebase.firestore.FieldValue.increment(newStockDiff)
       });
