@@ -10,6 +10,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="shortcut icon" href="favicon.ico">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap');
@@ -227,6 +228,15 @@ tr:hover td{background:#f5f3ff}
 <div id="login-screen">
   <div class="pin-card">
     <h1>🥘 エニクック<br>在庫管理</h1>
+    <div id="auth-box" style="display:none;width:100%">
+      <p style="margin-bottom:.8rem">この端末で初めて使うときだけ、ログインが必要です</p>
+      <div class="fg"><label>メールアドレス</label><input type="email" id="auth-email" value="info@any-cook.com" autocomplete="username"></div>
+      <div class="fg"><label>パスワード</label><input type="password" id="auth-pass" autocomplete="current-password" onkeydown="if(event.key==='Enter')doSignIn()"></div>
+      <button class="btn-rec" id="auth-btn" onclick="doSignIn()">ログイン</button>
+      <p id="auth-err" style="color:var(--danger);font-weight:700;min-height:1.2em;margin-top:.5rem"></p>
+    </div>
+    <div id="auth-wait" style="color:var(--muted);font-size:.9rem">読み込み中...</div>
+    <div id="pin-box" style="display:none;width:100%;flex-direction:column;align-items:center;gap:1.4rem">
     <p>4桁の暗証番号を入力</p>
     <div class="pin-dots">
       <div class="dot" id="d0"></div><div class="dot" id="d1"></div>
@@ -247,6 +257,8 @@ tr:hover td{background:#f5f3ff}
       <button class="pk d" onclick="pkd()">⌫</button>
     </div>
     <p id="pin-err"></p>
+    <button onclick="doSignOut()" style="background:none;color:var(--muted);font-size:.75rem;text-decoration:underline">この端末からサインアウト</button>
+    </div>
   </div>
 </div>
 
@@ -817,6 +829,7 @@ firebase.initializeApp({
 });
 var db = firebase.firestore();
 var FS = firebase.firestore.FieldValue;
+var auth = firebase.auth();
 
 // ===================================================
 //  PIN認証（暗証番号はハッシュ値で照合し、ソースに平文で置かない）
@@ -844,9 +857,7 @@ function checkPin(){
   sha256Hex(buf).then(function(hex){
     if(hex===PIN_HASH){
       sessionStorage.setItem('ac_ok','1');
-      document.getElementById('login-screen').style.display='none';
-      document.getElementById('app').style.display='flex';
-      startApp();
+      route();
     } else {
       document.getElementById('pin-err').textContent='暗証番号が違います';
       for(var i=0;i<4;i++) document.getElementById('d'+i).classList.add('shake');
@@ -854,20 +865,53 @@ function checkPin(){
     }
   });
 }
+// ===================================================
+//  Firebaseログイン（端末ごとに一度だけ。以後は暗証番号で開く）
+// ===================================================
+var authUser=null, authReady=false, appStarted=false;
+function route(){
+  var ls=document.getElementById('login-screen'), app=document.getElementById('app');
+  document.getElementById('auth-wait').style.display=authReady?'none':'block';
+  document.getElementById('auth-box').style.display=(authReady&&!authUser)?'block':'none';
+  document.getElementById('pin-box').style.display=(authReady&&authUser)?'flex':'none';
+  if(authUser&&sessionStorage.getItem('ac_ok')==='1'){
+    ls.style.display='none'; app.style.display='flex';
+    if(!appStarted){ appStarted=true; startApp(); }
+  } else {
+    ls.style.display='flex'; app.style.display='none';
+  }
+}
+function doSignIn(){
+  var email=document.getElementById('auth-email').value.trim();
+  var pass=document.getElementById('auth-pass').value;
+  var err=document.getElementById('auth-err'), btn=document.getElementById('auth-btn');
+  if(!email||!pass){ err.textContent='メールアドレスとパスワードを入力してください'; return; }
+  btn.disabled=true; err.textContent='';
+  auth.signInWithEmailAndPassword(email,pass).catch(function(e){
+    var c=e.code||'';
+    err.textContent=(c.indexOf('password')!==-1||c.indexOf('credential')!==-1||c.indexOf('user-not-found')!==-1)?'メールアドレスかパスワードが違います'
+      :c==='auth/too-many-requests'?'失敗が続いたため一時的に止められています。しばらくしてから試してください'
+      :c==='auth/network-request-failed'?'通信できません。電波を確認してください'
+      :'ログインできません（'+c+'）';
+  }).then(function(){ btn.disabled=false; document.getElementById('auth-pass').value=''; });
+}
+function doSignOut(){
+  if(!confirm('この端末からサインアウトしますか？\n次に使うときはメールアドレスとパスワードが必要です。')) return;
+  logout();
+  auth.signOut();
+}
 function logout(){
   sessionStorage.removeItem('ac_ok');
   unsubs.forEach(function(u){u();}); unsubs=[];
   items={materials:{},packaging:{},products:{}};
+  appStarted=false;
   buf=''; updDots();
-  document.getElementById('login-screen').style.display='flex';
-  document.getElementById('app').style.display='none';
+  route();
 }
-window.addEventListener('DOMContentLoaded',function(){
-  if(sessionStorage.getItem('ac_ok')==='1'){
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('app').style.display='flex';
-    startApp();
-  }
+auth.onAuthStateChanged(function(u){
+  authUser=u; authReady=true;
+  if(!u&&appStarted){ unsubs.forEach(function(x){x();}); unsubs=[]; appStarted=false; }
+  route();
 });
 
 // ===================================================
@@ -2223,7 +2267,7 @@ function dlCSV(rows, filename){
 (function(){
   if(!('caches' in window)) return;
   caches.keys().then(function(keys){
-    keys.forEach(function(k){ if(k!=='anycook-inventory-v6') caches.delete(k); });
+    keys.forEach(function(k){ if(k!=='anycook-inventory-v7') caches.delete(k); });
   });
 })();
 
