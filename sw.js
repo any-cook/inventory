@@ -1,5 +1,5 @@
 // キャッシュバージョンを上げると古いキャッシュが自動削除される
-const CACHE_NAME = 'anycook-inventory-v5';
+const CACHE_NAME = 'anycook-inventory-v6';
 
 self.addEventListener('install', function(e) {
   self.skipWaiting();
