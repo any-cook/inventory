@@ -1207,16 +1207,22 @@ function showUndo(text,undoFn){
 // ===================================================
 //  担当者ボタン（これまでの記録に出てくる名前を、多い順に表示）
 // ===================================================
+// いつも表示する担当者（人が増えたらここに名前を足す）
+var STAFF_FIXED=['平田','山田'];
+function showStaffChips(names){
+  STAFF_FIXED.forEach(function(n){ if(names.indexOf(n)<0) names.push(n); });
+  var html=names.map(function(n){
+    return '<button type="button" class="chip" data-n="'+esc(n)+'" onclick="pickStaff(this)">'+esc(n)+'</button>';
+  }).join('');
+  Object.keys(STAFF_BOX).forEach(function(box){ document.getElementById(box).innerHTML=html; });
+  markStaffChip();
+}
 function loadStaffNames(){
+  if(!document.querySelector('#staff-chips .chip')) showStaffChips([]);   // 読み込み前でも固定の名前は出す
   db.collection('transactions').orderBy('timestamp','desc').limit(300).get().then(function(snap){
     var cnt={};
     snap.forEach(function(d){ var n=(d.data().staff||'').trim(); if(n) cnt[n]=(cnt[n]||0)+1; });
-    var names=Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a];}).slice(0,8);
-    var html=names.map(function(n){
-      return '<button type="button" class="chip" data-n="'+esc(n)+'" onclick="pickStaff(this)">'+esc(n)+'</button>';
-    }).join('');
-    Object.keys(STAFF_BOX).forEach(function(box){ document.getElementById(box).innerHTML=html; });
-    markStaffChip();
+    showStaffChips(Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a];}).slice(0,8));
   }).catch(function(){});
 }
 // 名前ボタンの置き場所 → 入力欄
@@ -2506,7 +2512,7 @@ function dlCSV(rows, filename){
 (function(){
   if(!('caches' in window)) return;
   caches.keys().then(function(keys){
-    keys.forEach(function(k){ if(k!=='anycook-inventory-v10') caches.delete(k); });
+    keys.forEach(function(k){ if(k!=='anycook-inventory-v11') caches.delete(k); });
   });
 })();
 
