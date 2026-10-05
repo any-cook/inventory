@@ -232,6 +232,10 @@ tr:hover td{background:#f5f3ff}
 #toast button{background:#fff;color:var(--text);border-radius:8px;padding:.35rem .8rem;font-size:.82rem;font-weight:800;white-space:nowrap}
 .chip{background:#fff;border:2px solid var(--bd);border-radius:9999px;padding:.4rem .9rem;font-size:.9rem;font-weight:800;color:var(--text)}
 .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip-x{display:none;margin-left:.35rem;font-weight:800}
+.staff-edit .chip{border-style:dashed;border-color:var(--danger);background:#fff;color:var(--danger)}
+.staff-edit .chip-x{display:inline}
+.staff-edit-btn{background:none;border:none;color:var(--accent);font-size:.78rem;font-weight:800;text-decoration:underline;padding:.1rem .2rem;margin-left:.5rem}
 .ck-miss{border-color:var(--danger)!important;background:#fef2f2!important}
 @media(max-width:640px){
   #tabs{display:none}
@@ -438,10 +442,28 @@ tr:hover td{background:#f5f3ff}
         <label>賞味期限（任意）</label>
         <input type="date" id="io-expiry">
       </div>
+      <!-- 製品の入庫：原材料の検収④と同じ形でロット番号・賞味期限を入力 -->
+      <div id="pd-lot-card" style="display:none;background:#fff;border:2px solid var(--bd);border-radius:12px;padding:.75rem .9rem;margin-bottom:1rem;transition:border-color .12s">
+        <div style="display:flex;align-items:flex-start;gap:.65rem">
+          <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem">🏷️</span>
+          <div style="flex:1">
+            <div style="font-weight:800;font-size:.9rem;color:var(--text);margin-bottom:.25rem">ロット番号・賞味期限</div>
+            <div style="font-size:.78rem;color:var(--muted);line-height:1.6">製品に印字した賞味期限を入力してください<br>入力しておくと、1ヵ月前・2週間前・期限切れのときにアラートが出ます<br>ロット番号は空欄なら自動で付きます</div>
+          </div>
+          <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem" id="pd-lot-icon">⬜</span>
+        </div>
+        <div style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem">
+          <input type="text" id="pd-lot-val" placeholder="ロット番号"
+            style="background:var(--bg3);border:2px solid var(--bd);border-radius:8px;padding:.45rem .7rem;font-size:.88rem;color:var(--text)">
+          <input type="text" id="pd-expiry-val" placeholder="賞味期限" inputmode="text"
+            style="background:var(--bg3);border:2px solid var(--bd);border-radius:8px;padding:.45rem .7rem;font-size:.88rem;color:var(--text)"
+            oninput="updateProdLot()">
+        </div>
+      </div>
       <div class="fg">
-        <label>担当者名 <span style="color:var(--danger);font-size:.8rem">※必須</span></label>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem"><label>担当者名 <span style="color:var(--danger);font-size:.8rem">※必須</span></label><button type="button" class="staff-edit-btn" onclick="toggleStaffEdit()">名前ボタンを整理</button></div>
         <div id="staff-chips" style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.4rem"></div>
-        <input type="text" id="io-staff" placeholder="例：福士（上のボタンにない場合は入力）" oninput="markStaffChip()">
+        <input type="text" id="io-staff" placeholder="名前を入力（次回からボタンになります）" oninput="markStaffChip()">
       </div>
       <div class="fg">
         <label>備考（任意）</label>
@@ -560,9 +582,9 @@ tr:hover td{background:#f5f3ff}
         </select>
       </div>
       <div class="fg" style="margin-bottom:.85rem">
-        <label>棚卸しをした人の名前 <span style="color:var(--danger);font-size:.8rem">※必須</span></label>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem"><label>棚卸しをした人の名前 <span style="color:var(--danger);font-size:.8rem">※必須</span></label><button type="button" class="staff-edit-btn" onclick="toggleStaffEdit()">名前ボタンを整理</button></div>
         <div id="tana-staff-chips" style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.4rem"></div>
-        <input type="text" id="tana-staff" placeholder="例：福士（上のボタンにない場合は入力）" oninput="markStaffChip()">
+        <input type="text" id="tana-staff" placeholder="名前を入力（次回からボタンになります）" oninput="markStaffChip()">
       </div>
       <div id="tana-list"></div>
       <button class="btn-rec" style="margin-top:.5rem;background:var(--info)" onclick="commitTana()">差異を確定してリセットする</button>
@@ -744,7 +766,7 @@ tr:hover td{background:#f5f3ff}
     </div>
     <div class="fg">
       <label>担当者</label>
-      <input type="text" id="he-staff" placeholder="例：福士">
+      <input type="text" id="he-staff" placeholder="担当者名">
     </div>
     <div class="fg">
       <label>ロットNo</label>
@@ -1134,6 +1156,11 @@ function reverseTxOnItem(data,tx){
 // ===================================================
 function startApp(){
   setInspectionPlaceholders();
+  // 一括で消した名前は、この端末が覚えている「前回の担当者」からも一度だけ外す
+  if(!localStorage.getItem('staff_reset_1')){
+    ['io_staff','tana_staff'].forEach(function(k){ if(STAFF_HIDDEN_BASE[localStorage.getItem(k)]) localStorage.removeItem(k); });
+    localStorage.setItem('staff_reset_1','1');
+  }
   var st=localStorage.getItem('io_staff'); if(st) document.getElementById('io-staff').value=st;
   var ts=localStorage.getItem('tana_staff')||st; if(ts) document.getElementById('tana-staff').value=ts;
   // 以前ブラウザに保存されたGitHubトークンを削除（アップロード機能は廃止）
@@ -1207,24 +1234,64 @@ function showUndo(text,undoFn){
 // ===================================================
 //  担当者ボタン（これまでの記録に出てくる名前を、多い順に表示）
 // ===================================================
-// 一度でも記録に使われた名前が、自動でボタンになる（固定の名前は持たない）
-function showStaffChips(names){
+// 一度でも記録に使われた名前が、自動でボタンになる。
+// 「消した名前」は消した日時を覚えておき、それより後にその人の記録が入ったら自動でまた出す。
+var STAFF_HIDDEN_BASE={'平田':1791209000000,'福士':1791209000000,'山田':1791209000000}; // 2026/10/05 に一括で消した分
+var _staffHidden={}, _staffSeen=[], _staffEdit=false;
+try{ _staffHidden=JSON.parse(localStorage.getItem('staff_hidden')||'{}')||{}; }catch(e){ _staffHidden={}; }
+function staffSettingRef(){ return db.collection('settings').doc('staff'); }
+function saveStaffHidden(){
+  try{ localStorage.setItem('staff_hidden',JSON.stringify(_staffHidden)); }catch(e){}
+  staffSettingRef().set({hidden:_staffHidden}).catch(function(){});   // 他の端末にも反映（できない設定なら、この端末だけ）
+}
+function staffHiddenAt(n){ return Math.max(_staffHidden[n]||0, STAFF_HIDDEN_BASE[n]||0); }
+function tsMillis(ts){ return !ts?Date.now():ts.toMillis?ts.toMillis():(ts.seconds||0)*1000; }
+function showStaffChips(){
+  var names=_staffSeen.filter(function(s){ return s.last>staffHiddenAt(s.n); })
+    .sort(function(a,b){ return b.cnt-a.cnt; }).slice(0,20).map(function(s){ return s.n; });
   var html=names.map(function(n){
-    return '<button type="button" class="chip" data-n="'+esc(n)+'" onclick="pickStaff(this)">'+esc(n)+'</button>';
+    return '<button type="button" class="chip" data-n="'+esc(n)+'" onclick="pickStaff(this)">'+esc(n)+'<span class="chip-x">×</span></button>';
   }).join('');
-  Object.keys(STAFF_BOX).forEach(function(box){ document.getElementById(box).innerHTML=html; });
+  if(_staffEdit) html+='<span style="flex-basis:100%;font-size:.75rem;color:var(--danger);font-weight:700">'+(names.length?'消したい名前を押してください（記録は消えません）':'ボタンになっている名前はありません')+'</span>';
+  Object.keys(STAFF_BOX).forEach(function(box){
+    var el=document.getElementById(box); el.innerHTML=html; el.classList.toggle('staff-edit',_staffEdit);
+  });
+  document.querySelectorAll('.staff-edit-btn').forEach(function(b){ b.textContent=_staffEdit?'整理を終わる':'名前ボタンを整理'; });
   markStaffChip();
 }
 function loadStaffNames(){
-  db.collection('transactions').orderBy('timestamp','desc').limit(300).get().then(function(snap){
-    var cnt={};
-    snap.forEach(function(d){ var n=(d.data().staff||'').trim(); if(n) cnt[n]=(cnt[n]||0)+1; });
-    showStaffChips(Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a];}).slice(0,20));
+  var seen=db.collection('transactions').orderBy('timestamp','desc').limit(300).get().then(function(snap){
+    var m={};
+    snap.forEach(function(d){
+      var x=d.data(), n=(x.staff||'').trim(); if(!n) return;
+      var s=m[n]=m[n]||{n:n,cnt:0,last:0};
+      s.cnt++; s.last=Math.max(s.last,tsMillis(x.timestamp));
+    });
+    _staffSeen=Object.keys(m).map(function(k){ return m[k]; });
+  });
+  var hid=staffSettingRef().get().then(function(doc){
+    if(doc.exists&&doc.data().hidden){ _staffHidden=doc.data().hidden; try{ localStorage.setItem('staff_hidden',JSON.stringify(_staffHidden)); }catch(e){} }
   }).catch(function(){});
+  Promise.all([seen,hid]).then(showStaffChips).catch(function(){});
+}
+function toggleStaffEdit(){ _staffEdit=!_staffEdit; showStaffChips(); }
+function hideStaff(n){
+  var before=_staffHidden[n];
+  _staffHidden[n]=Date.now(); saveStaffHidden();
+  Object.keys(STAFF_BOX).forEach(function(box){ var inp=document.getElementById(STAFF_BOX[box]); if(inp.value.trim()===n) inp.value=''; });
+  ['io_staff','tana_staff'].forEach(function(k){ if(localStorage.getItem(k)===n) localStorage.removeItem(k); });
+  showStaffChips();
+  showUndo('「'+n+'」を名前ボタンから消しました',function(){
+    if(before) _staffHidden[n]=before; else delete _staffHidden[n];
+    saveStaffHidden(); showStaffChips();
+  });
 }
 // 名前ボタンの置き場所 → 入力欄
 var STAFF_BOX={'staff-chips':'io-staff','tana-staff-chips':'tana-staff'};
-function pickStaff(btn){ document.getElementById(STAFF_BOX[btn.parentNode.id]).value=btn.dataset.n; markStaffChip(); }
+function pickStaff(btn){
+  if(_staffEdit){ hideStaff(btn.dataset.n); return; }
+  document.getElementById(STAFF_BOX[btn.parentNode.id]).value=btn.dataset.n; markStaffChip();
+}
 function markStaffChip(){
   Object.keys(STAFF_BOX).forEach(function(box){
     var v=document.getElementById(STAFF_BOX[box]).value.trim();
@@ -1418,6 +1485,14 @@ function loadRecent(){
 //  入出庫フォーム
 // ===================================================
 function isChecklistMode(){ return ioType==='in'&&document.getElementById('io-cat').value==='materials'; }
+function isProductIn(){ return ioType==='in'&&document.getElementById('io-cat').value==='products'; }
+function updateProdLot(){
+  var on=!!document.getElementById('pd-expiry-val').value.trim();
+  var card=document.getElementById('pd-lot-card');
+  card.style.borderColor=on?'var(--ok)':'var(--bd)';
+  card.style.background=on?'#f0fdf4':'#fff';
+  document.getElementById('pd-lot-icon').textContent=on?'✅':'⬜';
+}
 var CK_CARDS=['ck-temp-card','ck-lot-card'];
 function checklistCards(){
   var arr=Array.from(document.querySelectorAll('#inspection-checklist label'));
@@ -1435,13 +1510,15 @@ function updateRecLabel(){
   } else btn.textContent=TYPE_LABEL[ioType]+'を記録する';
 }
 function syncIoFields(){
-  var t=ioType, ck=isChecklistMode();
+  var t=ioType, ck=isChecklistMode(), pd=isProductIn();
   document.getElementById('qty-label').textContent='数量（'+TYPE_LABEL[t]+'）';
   updateRecLabel();
   document.getElementById('rec-btn').className='btn-rec'+(t==='out'?' out':t==='discard'?' discard':'');
   // 原材料の入庫はチェックリスト内でロット・賞味期限を入力するので、重複する欄は隠す
-  document.getElementById('lot-field').style.display=(t==='in'&&!ck)?'flex':'none';
-  document.getElementById('expiry-field').style.display=(t==='in'&&!ck)?'block':'none';
+  // 製品の入庫は専用のカード（ロット番号・賞味期限）で入力する
+  document.getElementById('lot-field').style.display=(t==='in'&&!ck&&!pd)?'flex':'none';
+  document.getElementById('expiry-field').style.display=(t==='in'&&!ck&&!pd)?'block':'none';
+  document.getElementById('pd-lot-card').style.display=pd?'block':'none';
   document.getElementById('inspection-checklist').style.display=ck?'block':'none';
   updateRecLabel();
 }
@@ -1508,6 +1585,8 @@ function setInspectionPlaceholders(){
   var ymd=now.getFullYear()+'/'+(now.getMonth()+1+'').padStart(2,'0')+'/'+(''+now.getDate()).padStart(2,'0');
   document.getElementById('ck-lot-val').placeholder='ロット番号（記載例：L'+ymd.replace(/\//g,'')+'-001）';
   document.getElementById('ck-expiry-val').placeholder='賞味期限（記載例：'+ymd+'）';
+  document.getElementById('pd-lot-val').placeholder='ロット番号（記載例：L'+ymd.replace(/\//g,'')+'-001）';
+  document.getElementById('pd-expiry-val').placeholder='賞味期限（記載例：'+ymd+'）';
 }
 
 function loadIoItems(){
@@ -1612,6 +1691,15 @@ function submitIO(){
         if(!confirm('品温 '+tempVal+'℃ は基準（'+lim[1]+'）を超えています。\n返品または交換を依頼してください。\n\nそれでも入庫として記録しますか？')) return;
         extra.push('品温基準超過');
       }
+    } else if(isProductIn()){
+      lotNo=document.getElementById('pd-lot-val').value.trim();
+      var pdRaw=document.getElementById('pd-expiry-val').value.trim();
+      if(pdRaw){
+        expiry=normDate(pdRaw);
+        if(!expiry){ showMsg(msg,'賞味期限は「2027/07/24」のように年/月/日で入力してください','var(--danger)'); document.getElementById('pd-expiry-val').focus(); return; }
+      } else if(!confirm('賞味期限が入力されていません。\n入力しないと、この製品の期限アラートは出ません。\n\nこのまま記録しますか？')){
+        document.getElementById('pd-expiry-val').focus(); return;
+      }
     } else {
       lotNo=document.getElementById('io-lot').value.trim();
       expiry=document.getElementById('io-expiry').value||'';
@@ -1668,6 +1756,9 @@ function submitIO(){
     document.getElementById('io-note').value='';
     document.getElementById('io-lot').value='';
     document.getElementById('io-expiry').value='';
+    document.getElementById('pd-lot-val').value='';
+    document.getElementById('pd-expiry-val').value='';
+    updateProdLot();
     onItemSelect();
     loadRecent();
     setTimeout(function(){ if(msg.textContent.indexOf('✅')===0) msg.textContent=''; },5000);
@@ -2509,7 +2600,7 @@ function dlCSV(rows, filename){
 (function(){
   if(!('caches' in window)) return;
   caches.keys().then(function(keys){
-    keys.forEach(function(k){ if(k!=='anycook-inventory-v12') caches.delete(k); });
+    keys.forEach(function(k){ if(k!=='anycook-inventory-v13') caches.delete(k); });
   });
 })();
 
