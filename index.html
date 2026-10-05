@@ -433,7 +433,7 @@ tr:hover td{background:#f5f3ff}
             <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem">📦</span>
             <div style="flex:1">
               <div style="font-weight:800;font-size:.9rem;color:var(--text);margin-bottom:.25rem">③ 外装・衛生</div>
-              <div style="font-size:.78rem;color:var(--muted);line-height:1.6">著しい変形・破れ・濡れ・汚れがないこと・テープの剥がれや開封痕がないこと<br><span style="color:var(--danger);font-weight:700">⚠️ 水濡れ・霜つきは返品対象（一度溶けた可能性あり）</span><br>段ボールの潰れ・破れは異物混入リスクとして判断</div>
+              <div style="font-size:.78rem;color:var(--muted);line-height:1.6">著しい変形・破れ・濡れ・汚れがないこと・テープの剥がれや開封痕がないこと<br><span style="color:var(--danger);font-weight:700">⚠️ 水濡れ・霜つきは返品対象（一度溶けた可能性あり）</span><br>段ボールの潰れ・破れは異物混入リスクとして判断<br><span style="color:var(--danger);font-weight:700">⚠️ 上記内容に適していないと判断した場合は、返品または交換を依頼する</span></div>
             </div>
             <span style="font-size:1.3rem;flex-shrink:0;margin-top:.1rem" class="ck-icon">⬜</span>
           </label>
@@ -2267,7 +2267,7 @@ function dlCSV(rows, filename){
 (function(){
   if(!('caches' in window)) return;
   caches.keys().then(function(keys){
-    keys.forEach(function(k){ if(k!=='anycook-inventory-v7') caches.delete(k); });
+    keys.forEach(function(k){ if(k!=='anycook-inventory-v8') caches.delete(k); });
   });
 })();
 
